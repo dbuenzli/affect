@@ -1,0 +1,12 @@
+{0 Affect {%html: <span class="version">%%VERSION%%</span>%}}
+
+Composable concurrency primitives using OCaml effect handlers.
+
+{!modules: Fiber}
+
+{1:sample Sample IO interaction}
+
+These modules are just provided to show how one can compose fibers with
+the functionality of the {!Unix} module.
+
+{!modules: Funix Netmsg}

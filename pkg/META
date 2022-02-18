@@ -1,0 +1,21 @@
+description = "Composable concurrency primitives"
+version = "%%VERSION_NUM%%"
+
+requires = ""
+archive(byte) = "affect.cma"
+archive(native) = "affect.cmxa"
+plugin(byte) = "affect.cma"
+plugin(native) = "affect.cmxs"
+exists_if = "affect.cma"
+
+package "unix" (
+  description = "Unix support"
+  version = "%%VERSION_NUM%%"
+  directory = "unix"
+  requires = "unix affect"
+  archive(byte) = "affect_unix.cma"
+  archive(native) = "affect_unix.cmxa"
+  plugin(byte) = "affect_unix.cma"
+  plugin(native) = "affect_unix.cmxs"
+  exists_if = "affect_unix.cma"
+)
