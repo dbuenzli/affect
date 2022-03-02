@@ -16,8 +16,8 @@ module Id = struct
   let equal = Int.equal
   let compare = Int.compare
   let create =
-    let id = Atomic.make nil in
-    fun () -> Atomic.incr id; Atomic.get id
+    let id = Atomic.make (nil + 1) in
+    fun () -> Atomic.fetch_and_add id 1
 end
 
 module Id_map = Map.Make (Id)
