@@ -1,5 +1,4 @@
 open B0_kit.V000
-open B00_std
 open Result.Syntax
 
 (* OCaml library names *)
@@ -48,6 +47,9 @@ let mouse =
   let tsdl = B0_ocaml.libname "tsdl" in
   test_exe "mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect]
 
+let happy_eyeballs =
+  let doc = "Happy eyeballs" in
+  test_exe "happy_eyeballs.ml" ~doc ~requires:[unix; affect_unix]
 
 (* Packs *)
 
