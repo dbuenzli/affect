@@ -32,7 +32,7 @@ let test_exe ?(requires = []) ?(more_srcs = []) file ~doc =
   let srcs = test_src file :: more_srcs in
   let meta = B0_meta.(empty |> tag test) in
   let requires = affect :: requires in
-  B0_ocaml.exe (Fpath.basename ~no_ext:true file) ~doc ~srcs ~requires ~meta
+  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~doc ~srcs ~requires ~meta
 
 let test = test_exe "test.ml" ~doc:"affect tests"
 
@@ -55,25 +55,24 @@ let happy_eyeballs =
 
 let default =
   let meta =
-    let open B0_meta in
-    empty
-    |> add authors ["The affect programmers"]
-    |> add maintainers ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
-    |> add homepage "https://erratique.ch/software/affect"
-    |> add online_doc "https://erratique.ch/software/affect/doc"
-    |> add licenses ["ISC"]
-    |> add repo "git+https://erratique.ch/repos/affect.git"
-    |> add issues "https://github.com/dbuenzli/affect/issues"
-    |> add description_tags ["effects"; "concurrency"; "fibers";
-                             "org:erratique"; ]
-    |> add B0_opam.Meta.build
+    B0_meta.empty
+    |> ~~ B0_meta.authors ["The affect programmers"]
+    |> ~~ B0_meta.maintainers ["Daniel Bünzli <daniel.buenzl i@erratique.ch>"]
+    |> ~~ B0_meta.homepage "https://erratique.ch/software/affect"
+    |> ~~ B0_meta.online_doc "https://erratique.ch/software/affect/doc"
+    |> ~~ B0_meta.licenses ["ISC"]
+    |> ~~ B0_meta.repo "git+https://erratique.ch/repos/affect.git"
+    |> ~~ B0_meta.issues "https://github.com/dbuenzli/affect/issues"
+    |> ~~ B0_meta.description_tags ["effects"; "concurrency"; "fibers";
+                                     "org:erratique"; ]
+    |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
-    |> tag B0_opam.tag
-    |> add B0_opam.Meta.depends
+    |> ~~ B0_opam.depends
       [ "ocaml", {|>= "5.0.0"|};
         "ocamlfind", {|build|};
         "ocamlbuild", {|build|};
         "topkg", {|build & >= "1.0.3"|}; ]
+    |> B0_meta.tag B0_opam.tag
   in
-  B0_pack.v "default" ~doc:"affect" ~meta ~locked:true @@
+  B0_pack.make "default" ~doc:"affect" ~meta ~locked:true @@
   B0_unit.list ()
