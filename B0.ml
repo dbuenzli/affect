@@ -27,29 +27,29 @@ let affect_unix_lib =
 (* Tests *)
 
 let test_src f = `File Fpath.(v "test" // f)
-let test_exe ?(requires = []) ?(more_srcs = []) file ~doc =
+let test ?run:(r = false) ?(requires = []) ?(more_srcs = []) file ~doc =
   let file = Fpath.v file in
   let srcs = test_src file :: more_srcs in
-  let meta = B0_meta.(empty |> tag test) in
+  let meta = B0_meta.(empty |> tag test |> ~~ run r) in
   let requires = affect :: requires in
   B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~doc ~srcs ~requires ~meta
 
-let test = test_exe "test.ml" ~doc:"affect tests"
+let test_affect = test "test.ml" ~doc:"affect tests" ~run:true
 
 let test_unix =
   let requires = [unix; affect_unix] in
-  test_exe "test_funix.ml" ~doc:"affect.unix tests" ~requires
+  test "test_funix.ml" ~doc:"affect.unix tests" ~requires ~run:true
 
 let ping =
-  test_exe "ping.ml" ~doc:"Ping-pong test" ~requires:[unix; affect_unix]
+  test "ping.ml" ~doc:"Ping-pong test" ~requires:[unix; affect_unix]
 
 let mouse =
   let tsdl = B0_ocaml.libname "tsdl" in
-  test_exe "mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect]
+  test "mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect]
 
 let happy_eyeballs =
   let doc = "Happy eyeballs" in
-  test_exe "happy_eyeballs.ml" ~doc ~requires:[unix; affect_unix]
+  test "happy_eyeballs.ml" ~doc ~requires:[unix; affect_unix]
 
 (* Packs *)
 
@@ -63,12 +63,12 @@ let default =
     |> ~~ B0_meta.licenses ["ISC"]
     |> ~~ B0_meta.repo "git+https://erratique.ch/repos/affect.git"
     |> ~~ B0_meta.issues "https://github.com/dbuenzli/affect/issues"
-    |> ~~ B0_meta.description_tags ["effects"; "concurrency"; "fibers";
-                                     "org:erratique"; ]
+    |> ~~ B0_meta.description_tags
+      ["effects"; "concurrency"; "fibers"; "org:erratique"; ]
     |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
     |> ~~ B0_opam.depends
-      [ "ocaml", {|>= "5.0.0"|};
+      [ "ocaml", {|>= "5.2.0"|};
         "ocamlfind", {|build|};
         "ocamlbuild", {|build|};
         "topkg", {|build & >= "1.0.3"|}; ]
