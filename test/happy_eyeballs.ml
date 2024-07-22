@@ -1,3 +1,7 @@
+(*---------------------------------------------------------------------------
+   Copyright (c) 2024 The affect programmers. All rights reserved.
+   SPDX-License-Identifier: CC0-1.0
+  ---------------------------------------------------------------------------*)
 
 let happy_eyeballs :
     delay_s:float -> tries:(unit -> 'a option) list -> discard:('a -> unit) ->
