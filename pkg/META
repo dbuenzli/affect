@@ -1,21 +1,20 @@
-description = "Composable concurrency primitives"
+description = "Composable concurrency primitives for OCaml"
 version = "%%VERSION_NUM%%"
-
 requires = ""
 archive(byte) = "affect.cma"
 archive(native) = "affect.cmxa"
 plugin(byte) = "affect.cma"
 plugin(native) = "affect.cmxs"
-exists_if = "affect.cma"
+exists_if = "affect.cma affect.cmxa"
 
 package "unix" (
-  description = "Unix support"
-  version = "%%VERSION_NUM%%"
   directory = "unix"
+  description = "The affect.unix library"
+  version = "%%VERSION_NUM%%"
   requires = "unix affect"
   archive(byte) = "affect_unix.cma"
   archive(native) = "affect_unix.cmxa"
   plugin(byte) = "affect_unix.cma"
   plugin(native) = "affect_unix.cmxs"
-  exists_if = "affect_unix.cma"
+  exists_if = "affect_unix.cma affect_unix.cmxa"
 )

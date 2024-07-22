@@ -18,7 +18,7 @@ homepage: "https://erratique.ch/software/affect"
 doc: "https://erratique.ch/software/affect/doc"
 bug-reports: "https://github.com/dbuenzli/affect/issues"
 depends: [
-  "ocaml" {>= "5.0.0"}
+  "ocaml" {>= "5.2.0"}
   "ocamlfind" {build}
   "ocamlbuild" {build}
   "topkg" {build & >= "1.0.3"}
