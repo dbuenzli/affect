@@ -24,7 +24,6 @@ fun ~delay_s ~tries ~discard ->
   in
   loop tries
 
-
 let happy_eyeballs' :
     delay_s:float -> tries:(unit -> 'a option) list -> discard:('a -> unit) ->
     'a option

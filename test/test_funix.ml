@@ -3,14 +3,14 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
+open B0_testing
 
-let log fmt = Printf.printf (fmt ^^ "\n%!")
-
+let log = Test.log
 let flip = let () = Random.self_init () in Random.bool
 let now_s () = Unix.gettimeofday ()
 
 let test_sleeps () =
-  log "Testing simple sleep.";
+  Test.test "simple sleep" @@ fun () ->
   let main () =
     let rec loop start max n =
       if n > max then log " Took %02fs" (now_s () -. start) else
@@ -24,7 +24,7 @@ let test_sleeps () =
   ignore (Fiber.run ~unblock:Funix.unblock main)
 
 let test_either_sleep () =
-  log "Testing either shortest sleep.";
+  Test.test "either shortest sleep" @@ fun () ->
   let left_ret = ref false in
   let right_abort = ref false in
   let main () =
@@ -47,8 +47,9 @@ let test_either_sleep () =
   assert (!right_abort)
 
 let main () =
+  Test.main @@ fun () ->
   test_sleeps ();
   test_either_sleep ();
-  log "Success!"
+  ()
 
-let () = if !Sys.interactive then () else main ()
+let () = if !Sys.interactive then () else exit (main ())

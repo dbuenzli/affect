@@ -3,6 +3,7 @@ open Result.Syntax
 
 (* OCaml library names *)
 
+let b0_std = B0_ocaml.libname "b0.std"
 let unix = B0_ocaml.libname "unix"
 
 let affect = B0_ocaml.libname "affect"
@@ -34,15 +35,18 @@ let test ?run:(r = false) ?(requires = []) ?(more_srcs = []) file ~doc =
   let requires = affect :: requires in
   B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~doc ~srcs ~requires ~meta
 
-let test_affect = test "test.ml" ~doc:"affect tests" ~run:true
+let test_affect =
+  test "test.ml" ~doc:"affect tests" ~run:true ~requires:[b0_std]
 
 let test_unix =
-  let requires = [unix; affect_unix] in
+  let requires = [b0_std; unix; affect_unix] in
   test "test_funix.ml" ~doc:"affect.unix tests" ~requires ~run:true
 
-let ping =
-  test "ping.ml" ~doc:"Ping-pong test" ~requires:[unix; affect_unix]
+let test_busy =
+  let requires = [unix; affect_unix] in
+  test "test_busy.ml" ~doc:"Too much CPU used!" ~requires
 
+let ping = test "ping.ml" ~doc:"Ping-pong test" ~requires:[unix; affect_unix]
 let mouse =
   let tsdl = B0_ocaml.libname "tsdl" in
   test "mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect]

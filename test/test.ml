@@ -3,17 +3,21 @@
    SPDX-License-Identifier: ISC
   ---------------------------------------------------------------------------*)
 
-type log = (unit, out_channel, unit, unit, unit, unit) format6 -> unit
-let log fmt = Printf.printf (fmt ^^ "\n%!")
+open B0_testing
+
+type 'a log = ('a, Format.formatter, unit, unit) format4 -> 'a
+let log = B0_testing.Test.log
 let log_branch id fmt =
   let id = String.concat "." (List.map string_of_int id) in
-  Printf.printf (" [%s]: " ^^ fmt ^^ "\n%!") id
+  log (" [%s]: " ^^ fmt) id
 
 let flip = let () = Random.self_init () in Random.bool
 
 let test_simple_spawns () =
-  log "Testing simple spawn joining.";
-  let yield (log : log) = log "Yielding…"; Fiber.yield (); log "Comming back!"in
+  B0_testing.Test.test "simple spawn joining." @@ fun () ->
+  let yield (log : unit log) =
+    log "Yielding…"; Fiber.yield (); log "Comming back!"
+  in
   let branch n v = Fiber.spawn @@ fun () ->
     let log = log_branch [n] in
     log "Starting"; if flip () then yield log; v
@@ -29,7 +33,7 @@ let test_simple_spawns () =
   ignore (Fiber.run main)
 
 let test_abort_tree () =
-  log "Testing subtree abort";
+  B0_testing.Test.test "subtree abort" @@ fun () ->
   let max = 2 in
   let rec spawn depth rpath () =
     let log = log_branch (List.rev rpath) in
@@ -48,7 +52,7 @@ let test_abort_tree () =
   ignore (Fiber.run main)
 
 let test_abort () =
-  log "Testing potential abort";
+  B0_testing.Test.test "potential abort" @@ fun () ->
   let did_close = ref false in
   let sub () =
     let finally () = did_close := true in
@@ -65,7 +69,7 @@ let test_abort () =
   assert (!did_close)
 
 let test_lone () =
-  log "Testing lone fiber run.";
+  B0_testing.Test.test "lone fiber run" @@ fun () ->
   let did_it = ref false in
   let main () =
     Fiber.yield ();
@@ -76,7 +80,7 @@ let test_lone () =
   assert (!did_it)
 
 let test_main_waits () =
-  log "Testing main waits.";
+  B0_testing.Test.test "Testing main waits" @@ fun () ->
   let did_it = ref false in
   let sub () = Fiber.yield (); did_it := true in
   let main () = ignore (Fiber.spawn sub) in
@@ -84,7 +88,7 @@ let test_main_waits () =
   assert (!did_it)
 
 let test_main_abort () =
-  log "Testing main aborts.";
+  B0_testing.Test.test "main aborts" @@ fun () ->
   let sub_did_abort = ref false in
   let sub () = try Fiber.yield () with
   | Fiber.Abort -> sub_did_abort := true; raise Fiber.Abort
@@ -98,7 +102,7 @@ let test_main_abort () =
   assert (!sub_did_abort)
 
 let test_blocking () =
-  log "Testing block";
+  B0_testing.Test.test "blocking" @@ fun () ->
   let unblock, next =
     let i = ref (-2) in
     let blocked = ref [] in
@@ -149,6 +153,7 @@ let test_blocking () =
   assert (!aborted)
 
 let main () =
+  B0_testing.Test.main @@ fun () ->
   test_simple_spawns ();
   test_abort_tree ();
   test_abort ();
@@ -156,6 +161,6 @@ let main () =
   test_main_waits ();
   test_main_abort ();
   test_blocking ();
-  log "Success!"
+  ()
 
-let () = if !Sys.interactive then () else main ()
+let () = if !Sys.interactive then () else exit (main ())
