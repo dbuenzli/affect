@@ -120,7 +120,7 @@ let rec ping_pong endpoint ~max_ping_period () =
       pong_server endpoint
 
 let rec main () =
-  let endpoint = `Host ("localhost", 110011) in
+  let endpoint = `Host ("localhost", 10101) in
   let max_ping_period = 1.5 in
   let ping_pong = ping_pong endpoint ~max_ping_period in
   match Fiber.run ~unblock:Funix.unblock ping_pong with

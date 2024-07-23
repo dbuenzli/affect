@@ -25,7 +25,7 @@ let serve_client_wrap ~endpoint () =
   | Some v -> v
 
 let rec main () =
-  let endpoint = `Host ("localhost", 110011) in
+  let endpoint = `Host ("localhost", 10101) in
   let serve_client = serve_client_wrap ~endpoint in
   match Fiber.run ~unblock:Funix.unblock serve_client with
   | None -> main ()
