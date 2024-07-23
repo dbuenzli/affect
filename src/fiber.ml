@@ -84,6 +84,8 @@ let abort f = match f.state with
    XXX naïve "busy yielding" implementations. This needs to be improved
    by introducing waiter sets in the fibers or the scheduler. *)
 
+type 'a return = 'a option
+
 let poll f = match f.state with
 | Terminated v -> Some v
 | Running _ | Aborting -> None

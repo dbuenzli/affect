@@ -72,24 +72,28 @@ val id : 'a t -> id
     These functions provide access to the value returned by fibers in
     various ways. *)
 
-val poll : 'a t -> 'a option option
+type 'a return = 'a option
+(** The type for fiber return values of type ['a]. [None] is returned
+    if the fiber is aborted. *)
+
+val poll : 'a t -> 'a return option
 (** [poll f] polls the return value of [f]. This is:
     {ul
     {- [None] if the fiber is still executing.}
     {- [Some None] if the fiber is terminated and was aborted.}
     {- [Some (Some v)] if the fiber is terminated and returned value [v].}} *)
 
-val join : 'a t -> 'a option
+val join : 'a t -> 'a return
 (** [join f] waits for [f] to terminate and returns its value. This is
     [None] in case [f] aborted and [Some v] in case [f] returned with
     value [v]. *)
 
-val first : 'a t -> 'b t -> ('a option, 'b option) Either.t
+val first : 'a t -> 'b t -> ('a return, 'b return) Either.t
 (** [first f0 f1] waits for [f0] or [f1] to terminate and returns the
     value of the first one that did. If both are already terminated
     the value of [f0] is returned. *)
 
-val either : 'a t -> 'b t -> ('a, 'b) Either.t option
+val either : 'a t -> 'b t -> ('a, 'b) Either.t return
 (** [either f0 f1] waits for [f0] or [f1] to terminate, returns the
     value of the first one that does with a value and aborts the fiber
     that didn't (if not terminated yet). If both are already
