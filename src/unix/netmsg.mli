@@ -24,7 +24,8 @@ val fd : t -> Unix.file_descr
 
 val send : t -> string -> (bool, string) result
 (** [send c s] sends bytes [s] on [c]. The result is [Ok false] if
-    the peer ends the connection. *)
+    the peer ends the connection, no guarantees that the message went
+    through.  *)
 
 val recv : t -> (string option, string) result
 (** [recv c] receives bytes from [c] and is [Ok None] if the peer

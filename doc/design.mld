@@ -1,0 +1,91 @@
+{0 Affect design notes}
+
+{1 New design (october 2024)}
+
+{ol
+{- Only expose parallel asynchronous function calls with built-in
+   priority hints and structured cooperative concurrency and cancellation.
+   A {e fiber} is just a handle on such a call.}
+
+{- Negations.
+
+   {ol
+   {- No distinction between parallelism and concurrency. That's not
+      something one wants to ponder at every asynchronous call. Doing so
+      is fine control over scheduling (see next point).}
+
+   {- No fine grained control on scheduling. It's not
+      compositional. Just asynchronous function calls with three
+      priority hints and request for execution on the main (UI) thread.}
+
+   {- No fiddling with domain/threads or pools thereof at the user level.
+      It's not compositional and you don't want to thread these arguments
+      in your libraries. Only the program's [main] function setups that.}
+
+   {- No fiddling with fancy concurrency primitives or models. Only
+      a simple, fixed model, allows to reasonably think about how it
+      can be exploited compositionally. It becomes possible to understand
+      the exact consequences of using an asynchronous function call in
+      your library.}
+   {- No fancy dynamic ressource tracking in the fiber's scope. This
+      belongs to my type system and [Fun.protect]. It also keeps the
+      difference between synchronous and asynchronous function call
+      small, which in turn allows to sprinkle or retract asynchronous
+      calls in your code more easily.}}}
+
+{- The model still leaves a lot of freedom to implement {e schedulers}
+   for it. A fixed model implies that it becomes possible for the
+   runtime and schedulers to optimize for it and for library authors
+   to correctly design with it.}
+
+{- Cooperative structured cancellation. More natural [await]
+   (previously [join]) than the previous 2022 iteration of [Affect] which
+   only had structured cancellation topped with a franken-semi-cooperative
+   cancellation. Notably:
+   {ol
+   {-  A cancelled asynchronous function call can return partial results.}
+   {- No need to deal with {e maybe this was cancelled} when [await]ing.
+      Fibers no longer return [option]s.}
+   {- No need for the [finally] handler on fiber calls. This was needed because
+      if a fiber was cancelled before executing it would be denied any
+      execution. This is no longer the case. This alone show in my opinion
+      that the previous model was broken.}
+   {- Function calls in OCaml raise, thus it's natural for a parallel
+      asynchronous function call to raise too.}}}
+{- The {{!Fiber.concurrency_model}final model} feels just like a
+   rather natural extension of OCaml's functions calls. This is rather
+   pleasing in our functional programmer eyes.}}
+
+The cooperative cancellation design was taken from the
+{{:https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/}Swift concurrency model}. So was aswell the notion of
+priority (they have one more level though). The whole result is not far
+from what Swift
+propose except: we don't have [TaskGroup]s, it feels unecessary; we
+don't have detached tasks (this could easily be added); we don't have
+their "actors" which looks like their terminology for
+{{:https://en.wikipedia.org/wiki/Monitor_(synchronization)}monitors}.
+
+One question that remains is if that model is not too costly for the
+OCaml runtime system for say mainly IO bound programs. Though
+given the flexibility of effects you could still elect to run for
+example one concurrency model per domain or simply on a single domain.
+
+
+{1:choices Choices}
+
+{ol
+  {- Except forcing an await in the scheduler that throws out the results in
+     order to implement structured concurrency we don't do anything with
+     fibers that are not awaited when a fiber returns. We could:
+   {ol
+      {- Report errors, that is enforce an await all your asynchrounous calls
+         discipline.}
+      {- Do nothing on values but trap exceptions.}}
+   The first idea may make some pattern for speculative computing
+   more involved that they could be: just cancel
+   and forget, no need to await. The second idea it feels a bit
+   odd to make a difference between values and exceptions, I think
+   the stance should rather be either we disallow it or we don't care.
+   We could have a scheduler tracing mode that reports them but if
+   people start using as a design property (e.g. the forget mentioned)
+   it would a noisy signal.}}

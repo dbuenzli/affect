@@ -8,7 +8,8 @@
    ocamlfind ocamlopt -package tsdl,affect -linkpkg -thread -o mouse mouse.ml
    ./mouse
 
-   mouse runs two fiber. One asks for one click, the other for two. *)
+   mouse runs two fiber. One asks for the next click, the other one for the
+   two next clicks. Everyone will be served. *)
 
 let strf = Format.asprintf
 
@@ -52,10 +53,10 @@ end = struct
      This could easily be generalized to block on any event, we just
      use mouse up for demonstration purposes. *)
 
-  module Fmap = Map.Make (Fiber.E)
+  module Fmap = Map.Make (Fiber.Handle)
   type blocked =
     { mutable mouse_button_up : (int * int) ref Fmap.t;
-      ready : Fiber.E.t Queue.t; }
+      ready : Fiber.Handle.t Queue.t; }
 
   let blocked =
     let blocked_make () =
@@ -68,9 +69,9 @@ end = struct
     let b = blocked () in
     let cell = ref (0, 0) in
     let block f = b.mouse_button_up <- Fmap.add f cell b.mouse_button_up in
-    let abort f = b.mouse_button_up <- Fmap.remove f b.mouse_button_up in
-    let retv _ = !cell in
-    Fiber.block ~block ~abort ~retv
+    let cancel f = b.mouse_button_up <- Fmap.remove f b.mouse_button_up; true in
+    let return _ = !cell in
+    Fiber.block ~block ~cancel ~return
 
   let e = Sdl.Event.create ()
   let wait ~poll b =
@@ -105,15 +106,16 @@ let of_mice_and_men () =
   in
   let twice () = wait_click (); Sdl.log "One more please!"; wait_click () in
   Sdl.log "Please have a click!";
-  ignore (Fiber.spawn wait_click);
-  ignore (Fiber.spawn twice);
+  ignore (Fiber.async wait_click);
+  ignore (Fiber.async twice);
   ()
 
 let main () =
-  let run _w = Fiber.run ~unblock:Fsdl.unblock of_mice_and_men in
+  let run _w = Fiber.main ~unblock:Fsdl.unblock of_mice_and_men in
   match Fsdl.with_window run with
   | Error e -> Sdl.log "%s" e; exit 1
-  | Ok None -> Sdl.log "Of mice and men fiber aborted"; exit 1
-  | Ok Some () -> exit 0
+  | Ok () -> exit 0
+  | exception Fiber.Cancelled  ->
+      Sdl.log "Of mice and men fiber cancelled"; exit 1
 
 let () = if !Sys.interactive then () else main ()

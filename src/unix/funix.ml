@@ -4,7 +4,9 @@
   ---------------------------------------------------------------------------*)
 
 let uerror e = Unix.error_message e
-let fmt_error fmt = Format.kasprintf (fun s -> Error s) fmt
+let pp_fd ppf fd = Format.pp_print_int ppf (Obj.magic fd : int)
+let debug fmt = Format.eprintf (fmt ^^ "@.")
+let errorf fmt = Format.kasprintf (fun s -> Error s) fmt
 let string_subrange ?(first = 0) ?last s =
   let max = String.length s - 1 in
   let last = match last with
@@ -44,7 +46,7 @@ module Sleep = struct
 
   (* Sleeps *)
 
-  type t = { until : time_s; mutable fiber : Fiber.E.t option }
+  type t = { until : time_s; mutable fiber : Fiber.Handle.t option }
   let forever = { until = max_float; fiber = None }
   let for' ~dur_s fiber = { until = time_now_s () +. dur_s; fiber}
 
@@ -117,19 +119,23 @@ module Sleep = struct
     loop h (time_now_s ())
 end
 
-(* Per domain blocking data structure  *)
+(* Per domain blocking data structure
 
-module Fmap = Map.Make (Fiber.E)
+   TODO this was done for the previous affect design
+   it will need to be rethought for a multicore scheduler.
+*)
+
+module Fmap = Map.Make (Fiber.Handle)
 type blocked =
   { mutable read : Unix.file_descr Fmap.t;
     mutable write : Unix.file_descr Fmap.t;
-    fd_ready : Fiber.E.t Queue.t;
+    unblocked : Fiber.Handle.t Queue.t;
     sleeps : Sleep.heap; }
 
 let blocked =
   let blocked_make () =
     { read = Fmap.empty; write = Fmap.empty;
-      fd_ready = Queue.create (); sleeps = Sleep.heap ();  }
+      unblocked = Queue.create (); sleeps = Sleep.heap ();  }
   in
   let blocked = Domain.DLS.new_key blocked_make in
   fun () -> Domain.DLS.get blocked
@@ -139,25 +145,31 @@ let blocked =
 let block_read fd =
   let b = blocked () in
   let block fd f = b.read <- Fmap.add f fd b.read in
-  let abort f = b.read <- Fmap.remove f b.read in
-  let retv _ = () in
-  Fiber.block ~block:(block fd) ~abort ~retv
+  let cancel f =
+    if Fmap.mem f b.read then (b.read <- Fmap.remove f b.read; true) else
+    false (* TODO read done, we would have to remove it from queue. *)
+  in
+  let return _ = () in
+  Fiber.block ~block:(block fd) ~cancel ~return
 
 let block_write fd =
   let b = blocked () in
   let block fd f = b.write <- Fmap.add f fd b.write in
-  let abort f = b.write <- Fmap.remove f b.write in
-  let retv _ = () in
-  Fiber.block ~block:(block fd) ~abort ~retv
+  let cancel f =
+    if Fmap.mem f b.write then (b.write <- Fmap.remove f b.write; true) else
+    false (* TODO write done, we would have to remove it from unblocked. *)
+  in
+  let return _ = () in
+  Fiber.block ~block:(block fd) ~cancel ~return
 
 let sleep_s dur_s =
+  (*  TODO a bit ugly *)
   let b = blocked () in
-  (* A bit ugly, better Fiber.block ?  *)
   let s = Sleep.for' ~dur_s None in
   let block f = s.Sleep.fiber <- Some f; Sleep.add b.sleeps s in
-  let abort f = s.Sleep.fiber <- None in
-  let retv _ = () in
-  Fiber.block ~block ~abort ~retv
+  let cancel f = s.Sleep.fiber <- None; true in
+  let return _ = ()  in
+  Fiber.block ~block ~cancel ~return
 
 let wait ~poll b =
   let timeout =
@@ -174,15 +186,15 @@ let wait ~poll b =
   | rset, wset, _ ->
       if rset = [] && wset = [] then Sleep.wakeup b.sleeps else
       let upd xset f fd = match List.mem fd xset with
-      | true -> Queue.add f b.fd_ready; None | false -> Some fd
+      | true -> Queue.add f b.unblocked; None | false -> Some fd
       in
       (if rset <> [] then b.read <- Fmap.filter_map (upd rset) b.read);
       (if wset <> [] then b.write <- Fmap.filter_map (upd wset) b.write);
-      Queue.take_opt b.fd_ready
+      Queue.take_opt b.unblocked
 
 let unblock ~poll =
   let b = blocked () in
-  match Queue.take_opt b.fd_ready with
+  match Queue.take_opt b.unblocked with
   | Some _ as f -> f
   | None ->
       match Sleep.wakeup b.sleeps with
@@ -221,7 +233,12 @@ let rec connect fd addr = match Unix.connect fd addr with
     | None -> ()
     | Some error -> raise (Unix.Unix_error (error, "connect", ""))
 
-let close_noerr fd = try Unix.close fd with Unix.Unix_error _ -> ()
+let close_noerr fd =
+  (* XXX should we remove the fd from reads and writes ?
+     It can gives obscure EBADF on select but then it means you
+     are still operating on the fd. So it will result in infinite block
+     somewhere *)
+  try Unix.close fd with Unix.Unix_error _ -> ()
 
 (* Socket endpoints *)
 
@@ -243,7 +260,7 @@ let endpoint_of_string ~default_port s =
               let h = string_subrange ~last:(i - 1) s in
               let p = string_subrange ~first:(i + 1) s in
               match int_of_string_opt p with
-              | None -> fmt_error "port %S not an integer" p
+              | None -> errorf "port %S not an integer" p
               | Some p -> Ok (`Host (h, p))
 
 let pp_endpoint ppf ep =
@@ -259,7 +276,7 @@ let rec socket_of_endpoint ep stype = match ep with
 | `Fd fd -> Ok (None, fd, false)
 | `Host (name, port) ->
     begin match Unix.gethostbyname name with
-    | exception Not_found -> fmt_error "%s: host not found" name
+    | exception Not_found -> errorf "%s: host not found" name
     | h ->
         let c = `Sockaddr (Unix.ADDR_INET (h.h_addr_list.(0), port)) in
         socket_of_endpoint c stype

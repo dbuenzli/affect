@@ -1,15 +1,15 @@
-Affect — Composable concurrency primitives for OCaml
-====================================================
-%%VERSION%%
+Affect — Concurrency and parallelism for OCaml 5
+================================================
 
-Affect provides composable concurrency primitives for OCaml using the
-effect handlers available in OCaml 5.0.
-
-Affect should be seen as an experiment at that point.
+Affect is a streamlined and natural [concurrency model] for OCaml 5.
+It just provides parallel asynchronous function calls with structured
+cooperative concurrency and cancellation.
 
 Affect is distributed under the ISC license. It has no dependencies.
 
 Homepage: <https://erratique.ch/software/affect>  
+
+[concurrency model]: https://erratique.ch/software/affect/doc/Fiber/index.html#concurrency_model
 
 ## Installation
 
@@ -39,5 +39,7 @@ directory.
   do useless networking on your machine.
 * [`mouse.ml`](test/mouse.ml), proof of concept interfacing 
   with the SDL event loop.
+* [`happy_eyeballs.ml`](test/happy_eyeballs.ml), an implementation
+  of a happy eyeballs 
 
 You can run them with `b0 -- ping` or `b0 -- mouse`.

@@ -1,4 +1,4 @@
-description = "Composable concurrency primitives for OCaml"
+description = "Concurrency and parallelism for OCaml 5"
 version = "%%VERSION_NUM%%"
 requires = ""
 archive(byte) = "affect.cma"

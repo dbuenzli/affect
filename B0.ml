@@ -12,7 +12,7 @@ let affect_unix = B0_ocaml.libname "affect.unix"
 (* Libraries *)
 
 let affect_lib =
-  let srcs = [ `Dir ~/"src" ] in
+  let srcs = [ `Dir ~/"src"; `X ~/"src/affect_top_init.ml" ] in
   B0_ocaml.lib affect ~srcs
 
 let affect_unix_lib =
@@ -24,26 +24,28 @@ let affect_unix_lib =
 let test ?(requires = []) = B0_ocaml.test ~requires:(affect :: requires)
 
 let test_affect =
-  test ~/"test/test.ml" ~doc:"affect tests" ~run:true ~requires:[b0_std; affect]
+  let doc = "Fiber tests" in
+  test ~/"test/test_fiber.ml" ~doc ~requires:[b0_std; affect]
 
 let test_unix =
   let requires = [b0_std; unix; affect_unix] in
-  test ~/"test/test_funix.ml" ~doc:"affect.unix tests" ~requires ~run:true
+  test ~/"test/test_funix.ml" ~doc:"affect.unix tests" ~requires
 
 let test_busy =
   let requires = [unix; affect_unix] in
-  test ~/"test/test_busy.ml" ~doc:"Too much CPU used!" ~requires
+  test ~/"test/test_busy.ml" ~doc:"No CPU used!" ~requires ~run:false
 
 let ping =
-  test ~/"test/ping.ml" ~doc:"Ping-pong test" ~requires:[unix; affect_unix]
+  let requires = [unix; affect_unix] in
+  test ~/"test/ping.ml" ~doc:"Ping-pong test" ~requires ~run:false
 
 let mouse =
   let tsdl = B0_ocaml.libname "tsdl" in
-  test ~/"test/mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect]
+  test ~/"test/mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect] ~run:false
 
 let happy_eyeballs =
   let doc = "Happy eyeballs" in
-  test ~/"test/happy_eyeballs.ml" ~doc ~requires:[unix; affect_unix]
+  test ~/"test/happy_eyeballs.ml" ~doc ~requires:[unix; affect_unix] ~run:false
 
 (* Packs *)
 
@@ -58,11 +60,11 @@ let default =
     |> ~~ B0_meta.repo "git+https://erratique.ch/repos/affect.git"
     |> ~~ B0_meta.issues "https://github.com/dbuenzli/affect/issues"
     |> ~~ B0_meta.description_tags
-      ["effects"; "concurrency"; "fibers"; "org:erratique"; ]
+      ["effects"; "concurrency"; "parallelism"; "fibers"; "org:erratique"; ]
     |> ~~ B0_opam.build
       {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
     |> ~~ B0_opam.depends
-      [ "ocaml", {|>= "5.2.0"|};
+      [ "ocaml", {|>= "5.3.0"|};
         "ocamlfind", {|build|};
         "ocamlbuild", {|build|};
         "topkg", {|build & >= "1.0.3"|}; ]

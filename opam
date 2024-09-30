@@ -1,24 +1,25 @@
 opam-version: "2.0"
 name: "affect"
-synopsis: "Composable concurrency primitives for OCaml"
+synopsis: "Concurrency and parallelism for OCaml 5"
 description: """\
-Affect provides composable concurrency primitives for OCaml using the
-effect handlers available in OCaml 5.0.
-
-Affect should be seen as an experiment at that point.
+Affect is a streamlined and natural [concurrency model] for OCaml 5.
+It just provides parallel asynchronous function calls with structured
+cooperative concurrency and cancellation.
 
 Affect is distributed under the ISC license. It has no dependencies.
 
-Homepage: <https://erratique.ch/software/affect>"""
+Homepage: <https://erratique.ch/software/affect>  
+
+[concurrency model]: https://erratique.ch/software/affect/doc/Fiber/index.html#concurrency_model"""
 maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
 authors: "The affect programmers"
 license: "ISC"
-tags: ["effects" "concurrency" "fibers" "org:erratique"]
+tags: ["effects" "concurrency" "parallelism" "fibers" "org:erratique"]
 homepage: "https://erratique.ch/software/affect"
 doc: "https://erratique.ch/software/affect/doc"
 bug-reports: "https://github.com/dbuenzli/affect/issues"
 depends: [
-  "ocaml" {>= "5.2.0"}
+  "ocaml" {>= "5.3.0"}
   "ocamlfind" {build}
   "ocamlbuild" {build}
   "topkg" {build & >= "1.0.3"}

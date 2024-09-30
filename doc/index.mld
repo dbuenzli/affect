@@ -1,6 +1,9 @@
 {0 Affect {%html: <span class="version">%%VERSION%%</span>%}}
 
-Composable concurrency primitives using OCaml effect handlers.
+Affect is a streamlined and natural
+{{!Fiber.concurrency_model}concurrency model} for OCaml 5. It just
+provides parallel asynchronous function calls with structured
+cooperative concurrency and cancellation.
 
 {!modules: Fiber}
 
@@ -10,3 +13,55 @@ These modules are just provided to show how one can compose fibers with
 the functionality of the {!Unix} module.
 
 {!modules: Funix Netmsg}
+
+{1:todo TODO}
+
+See also the {{!page-design}design notes}.
+
+{ul
+{- More {e scheduling} extensibility ? E.g. we could have
+   an heterogenous dict on fibers in which more hints can be tucked.}
+{- Expose the internals for allowing other schedulers. We have
+   a problem with the unboxed of {!Handle.t}, see
+   {{:https://discuss.ocaml.org/t/this-type-cannot-be-unboxed}here}.
+   We may need to go back to boxed existentials and store one
+   in the fiber as we used to do.}
+{- Client defined blocks and their associated [unblock] are very
+   general and they don't compose well. We should not allow
+   them to block on [poll:false]: we should give them a function
+   to unblock the scheduler. Also more should be said about how
+   unblock functions are called by schedulers. Another strategy would
+   be for the scheduler to give a function to call to unblock on
+   {!Fiber.block} creations. That would in turn render [unblock] functions
+   useless but the scheduler losses the global view on "unblocker" execution.}
+{- Not sold on the design of {!Fiber.block} yet. Maybe the narrative
+   should be on on an asynchronous "primitive", in the same way
+   we have C primitives. It would also nice to have a compositional await
+   à la CML {!Event}, having the trapping combinators is nice but it's also
+   a bit wasteful (depends on how lightweight we can make the fibers). It's
+   should be a unification of blocking, e.g. it should be possible to
+   conjunct and disjunct on a blocking operation and an await. Look again
+   the waiter sets we had in Fut. In fact it's likely that {!block}
+   is just a form of event in which you can indicate it will never happen.
+   The whole narrative becomes that we have fibers and (composable) events
+   they can block on until they occur, the return of a fiber/system function
+   call is a particular event. We end up inventing nothing which is a good
+   sign.}
+{- Cancellation of {!block} still needs more work. The problem with
+   the current suggestion on {!block} is that users may rely on
+   raising {!block} for their own cancellation. But that's
+   racy. Perhaps we should always raise on a block by a cancelled ops
+   except in {!Fiber.non_cancelling_block} scopes. And {!async}'s in
+   these blocks should not start cancelled. But the nesting may be
+   difficult to comprehend. This needs to be pinned against concrete
+   code.}
+{- {!Fiber.poll} is smelly. Tempts users into scheduling. If that
+   is the case it may mean that we don't have good enough synchronsation
+   tools.}
+{- Add an {!Fiber.await_cancellation} function.}
+{- Old note. [Funix] shows how to use [Fiber.block] with [Unix.select].
+   It would be interesting to be able to use a fixed API but switch backends.
+   One way would be to use effects in the [Fiber.block] argument and let
+   backend interprets them. This would lead to the following code
+   structure:
+   {[Evloop.run (fun () -> Fiber.run ~unblock:Evloop.unblock main)]}}}
