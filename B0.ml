@@ -11,49 +11,39 @@ let affect_unix = B0_ocaml.libname "affect.unix"
 
 (* Libraries *)
 
-let src f = `File Fpath.(v "src" / f)
-
 let affect_lib =
-  let srcs = [src "fiber.mli"; src "fiber.ml"] in
-  let requires = [] in
-  B0_ocaml.lib affect ~doc:"The affect library" ~srcs ~requires
+  let srcs = [ `Dir ~/"src" ] in
+  B0_ocaml.lib affect ~srcs
 
 let affect_unix_lib =
-  let srcs = [src "funix.mli"; src "funix.ml";
-              src "netmsg.mli"; src "netmsg.ml"]
-  in
-  let requires = [unix; affect] in
-  B0_ocaml.lib affect_unix ~doc:"The affect.unix library" ~srcs ~requires
+  let srcs = [ `Dir ~/"src/unix" ] in
+  B0_ocaml.lib affect_unix ~srcs ~requires:[unix; affect]
 
 (* Tests *)
 
-let test_src f = `File Fpath.(v "test" // f)
-let test ?run:(r = false) ?(requires = []) ?(more_srcs = []) file ~doc =
-  let file = Fpath.v file in
-  let srcs = test_src file :: more_srcs in
-  let meta = B0_meta.(empty |> tag test |> ~~ run r) in
-  let requires = affect :: requires in
-  B0_ocaml.exe (Fpath.basename ~strip_ext:true file) ~doc ~srcs ~requires ~meta
+let test ?(requires = []) = B0_ocaml.test ~requires:(affect :: requires)
 
 let test_affect =
-  test "test.ml" ~doc:"affect tests" ~run:true ~requires:[b0_std]
+  test ~/"test/test.ml" ~doc:"affect tests" ~run:true ~requires:[b0_std; affect]
 
 let test_unix =
   let requires = [b0_std; unix; affect_unix] in
-  test "test_funix.ml" ~doc:"affect.unix tests" ~requires ~run:true
+  test ~/"test/test_funix.ml" ~doc:"affect.unix tests" ~requires ~run:true
 
 let test_busy =
   let requires = [unix; affect_unix] in
-  test "test_busy.ml" ~doc:"Too much CPU used!" ~requires
+  test ~/"test/test_busy.ml" ~doc:"Too much CPU used!" ~requires
 
-let ping = test "ping.ml" ~doc:"Ping-pong test" ~requires:[unix; affect_unix]
+let ping =
+  test ~/"test/ping.ml" ~doc:"Ping-pong test" ~requires:[unix; affect_unix]
+
 let mouse =
   let tsdl = B0_ocaml.libname "tsdl" in
-  test "mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect]
+  test ~/"test/mouse.ml" ~doc:"Mouse test" ~requires:[tsdl; affect]
 
 let happy_eyeballs =
   let doc = "Happy eyeballs" in
-  test "happy_eyeballs.ml" ~doc ~requires:[unix; affect_unix]
+  test ~/"test/happy_eyeballs.ml" ~doc ~requires:[unix; affect_unix]
 
 (* Packs *)
 

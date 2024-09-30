@@ -1,11 +1,5 @@
 true : bin_annot, safe_string
-
 <_b0> : -traverse
 <src> : include
-<src/funix*> : package(unix)
-<src/netmsg*> : package(unix)
-
-<test> : include
-<test/ping*> : package(unix)
-<test/test_funix*> : package(unix)
-<test/mouse*> : thread, package(tsdl)
+<src/unix> : include
+<src/unix/**> : package(unix)
