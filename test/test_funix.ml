@@ -5,13 +5,13 @@
 
 open B0_testing
 
-let log fmt = Test.log ("%a " ^^ fmt) Fiber.Handle.pp (Fiber.Handle.self ())
+let log fmt = Test.Log.msg ("%a " ^^ fmt) Fiber.Handle.pp (Fiber.Handle.self ())
 let unblock = Funix.unblock
 
 let rand = Test.Rand.state ()
 let flip () = Random.State.bool rand
 let now_s () = Unix.gettimeofday ()
-let test_sleeps () =
+let test_sleeps =
   Test.test "simple sleep" @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
   let rec f start n =
@@ -25,7 +25,7 @@ let test_sleeps () =
   f start 4;
   log " Took %02fs" (now_s () -. start)
 
-let test_either_sleep () =
+let test_either_sleep =
   Test.test "Fiber.pick_either shortest sleep" @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
   let left_returns = ref false in

@@ -4,8 +4,9 @@
   ---------------------------------------------------------------------------*)
 
 open B0_testing
+open B0_std
 
-let log fmt = Test.log ("%a " ^^ fmt) Fiber.Handle.pp (Fiber.Handle.self ())
+let log fmt = Test.Log.msg ("%a " ^^ fmt) Fiber.Handle.pp (Fiber.Handle.self ())
 let unblock = Fiber.never_unblock
 
 let fail_may_hang f = f () (* TODO timeout these *)
@@ -26,23 +27,23 @@ let traced_async_val v =
   log "Called %a" Fiber.pp f; traced_may_yield (); f
 
 let traced_await pp f =
-  log "Awaiting %a" (Fiber.pp' Test.Fmt.text_string) f;
+  log "Awaiting %a" (Fiber.pp' Fmt.text_string) f;
   let v = Fiber.await f in
   log "Got %a" (Fiber.pp' pp) f; v
 
 (* Tests *)
 
-let test_basic_scheduling () =
+let test_basic_scheduling =
   Test.test "basic scheduling" @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
   log "I'm the main here";
   let msgs = ["Hey"; "ho,"; "let's go!"] in
   let fs = List.map traced_async_val msgs in
-  let vs = List.map (traced_await Test.Fmt.text_string) fs in
-  Test.(list ~elt:Eq.string) msgs vs ~__POS__;
+  let vs = List.map (traced_await Fmt.text_string) fs in
+  Test.(list T.string) msgs vs ~__POS__;
   ()
 
-let test_async_await () =
+let test_async_await =
   Test.test "Fiber.{async,await}" @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
   let f0 () = true in
@@ -51,7 +52,7 @@ let test_async_await () =
   Test.raises Exit (fun () -> Fiber.await (Fiber.async f1)) ~__POS__;
   ()
 
-let test_fibers_are_structured () =
+let test_fibers_are_structured =
   Test.test "fibers are structured, wait for fibers" @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
   let f0_returned = ref false in
@@ -67,7 +68,7 @@ let test_fibers_are_structured () =
   Test.holds !f1_returned ~__POS__;
   ()
 
-let test_fiber_cancellation_is_structured () =
+let test_fiber_cancellation_is_structured =
   Test.test "fibers cancellation is structured" @@
   fail_may_hang @@ fun () ->
   fun () ->
@@ -84,7 +85,7 @@ let test_fiber_cancellation_is_structured () =
   Fiber.await (Fiber.async f2);
   ()
 
-let test_main_is_structured () =
+let test_main_is_structured =
   Test.test "main is structured, waits for fibers" @@ fun () ->
   let f0_returned = ref false in
   let f1_returned = ref false in
@@ -98,7 +99,7 @@ let test_main_is_structured () =
   Test.holds !f1_returned ~__POS__;
   ()
 
-let test_main_cancellation_is_structured () =
+let test_main_cancellation_is_structured =
   Test.test "main cancellation is structured" @@ fun () ->
   fail_may_hang @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
@@ -111,13 +112,13 @@ let test_main_cancellation_is_structured () =
   ignore (Fiber.await a1);
   ()
 
-let test_main_no_async_calls () =
+let test_main_no_async_calls =
   Test.test "main makes no async calls" @@ fun () ->
   Test.holds (Fiber.main ~unblock @@ fun () -> true) ~__POS__;
   Test.holds (Fiber.main ~unblock @@ fun () -> Fiber.yield (); true) ~__POS__;
   ()
 
-let test_await_all () =
+let test_await_all =
   Test.test "Fiber.await_all" @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
   let async v =
@@ -127,10 +128,10 @@ let test_await_all () =
   let is = [1; 2; 3; 4] in
   let fs = List.map async is in
   let vs = Fiber.await_all fs in
-  Test.(list ~elt:Eq.int) is vs ~__POS__;
+  Test.(list T.int) is vs ~__POS__;
   ()
 
-let test_await_first () =
+let test_await_first =
   Test.test "Fiber.await_first" @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
   let is = [1; 2; 3; 4] in
@@ -142,10 +143,10 @@ let test_await_first () =
       collect (v :: acc) fs
   in
   let vs = collect [] fs in
-  Test.(list ~elt:Eq.int) is vs ~__POS__;
+  Test.(list T.int) is vs ~__POS__;
   ()
 
-let test_pick_either () =
+let test_pick_either =
   Test.test "Fiber.pick_either" @@ fun () ->
   fail_may_hang @@ fun () ->
   Fiber.main ~unblock @@ fun () ->
@@ -172,7 +173,7 @@ let test_pick_either () =
   end;
   ()
 
-let test_block () =
+let test_block =
   Test.test "block" @@ fun () ->
   let unblock, block =
     let q = Queue.create () in
