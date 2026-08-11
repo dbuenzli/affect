@@ -4,7 +4,7 @@ Affect is a streamlined and natural concurrency model for OCaml.
 
 It provides parallel asynchronous functions and first-class synchronous
 actions to orchestrate them. The resulting
-{{!page-concurrency_model}concurency model} has structured cooperative
+{{!page-concurrency_model}concurrency model} has structured cooperative
 concurrency, structured cancellation and structured effect handling.
 
 {b Warning.} These APIs are still subject to change in the future,
