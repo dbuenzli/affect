@@ -1,91 +1,424 @@
 {0 Affect design notes}
 
-{1 New design (october 2024)}
+{1:choices Choices and guidelines}
+
+{ol
+{- Align mecanisms on syntactic and function scopes to ease reasoning.
+   Structured concurrency, structured cancellation and structured user
+   effect handling.}
+
+{- No distinction between parallelism and concurrency. That's not
+   something one wants to ponder at every asynchronous call. Doing so
+   is fine control over scheduling (see next point). It's also
+   more complex to reason about (e.g. two mutual exclusion modes can be
+   distinguished instead of one).}
+
+{- No fine grained control on scheduling. It's not compositional,
+   function execution must be oblivious of its scheduling and
+   insensitive to the way parallellism is configured by the running
+   program. Still, functions are provided with three priority {e hints}
+   and request for execution on the main domain (in affect: the one
+   which setups the scheduler).}
+
+{- No fiddling with domain and threads or pools thereof at the user level.
+   It's not compositional and you don't want to thread these arguments
+   in your libraries. Only the program's [main] function setups that.}
+
+{- No fiddling with fancy concurrency primitives or models. Only a
+   simple, fixed model, allows to reasonably think about how it can
+   be exploited compositionally. It becomes possible to understand
+   the exact consequences of using an asynchronous function call in
+   your library.}
+
+{- No fancy dynamic ressource tracking in the function's scope. This
+   belongs to my type system and [Fun.protect]. It also keeps the
+   difference between synchronous and asynchronous function calls
+   small, which in turn allows to sprinkle or retract asynchronous
+   calls in your code more easily.}
+
+{- Answer design questions by minimizing differences between regular functions
+   and asynchronous function. Again it should be easy to retract or sprinkle
+   code with calls to [Fun.Async.call] without too much surprises.}}
+
+{2:asynchronous_function Asynchronous functions}
+
+{ol
+{- Why give asynchronous function results a {!Affect.Cell.Once} semantics
+   instead of a rendez-vous or a single shot inclusive action
+   semantics?  It wouldn't be natural. Once a function has computed
+   and you still have the call handle value you just want to be able
+   to get that result regardless of whether the function has already
+   returned or not. Trying to be different would clash with point
+   7. of {!choices}.}
+
+{- Do not force functions to get the result of their asychronous function
+   calls.
+
+   Alternative would be at the end of the function:
+   {ol
+   {- Report errors, that is enforce users to get results before.}
+   {- Do nothing on values but trap exceptions}}
+
+   The first idea may make some pattern for imperative parallel or
+   speculative computing (cancel and forget) more involved than they
+   could be – it also means that you consider that asynchronous
+   functions are a ressource which is not a view that we want to take
+   (again point 7. of {!choices}).
+
+   The second idea it feels a bit odd to make a difference between
+   values and exceptions. In both cases trying to track if a [get] was
+   attempted would entail a fair amount of bookeeping (perhaps not in fact).
+
+   This is not to say that this decision is not problematic as it
+   may make unexpected exceptions go unoticed. We try to alleviate that
+   by providing {!Affect.Fun.Async.call_trap_exn} for those users
+   who rely on structured concurrency to synchronize, but that remains
+   something the user has to do explicitely and may forget to do.}
+
+{- Why not provide a way to escape the strict structured concurrency
+   discipline, for example by providing a [Fun.Async.detached_call],
+   where either you can specify an arbitrary parent or simply makes
+   the call attached to the root asynchronous function. We feel that:
+   {ol
+   {- Doing so significantly weakens the value proposal of structured
+      concurrency. Especially from a library usage perspective, it's nice
+      to know that the asynchronous function call they invoke do
+      not escape your control.}
+   {- If you really need that for more sophisticated application-level
+      scenarios, affect is sufficiently flexible not to
+      be stuck by that. Function synchronisation actions or
+      function to call can be sent over ports, either to a listening
+      asynchronous function call "server" you called at the start of your
+      program in the root asynchronous function or even to another
+      scheduler running in program.}}}}
+
+{2:cancellation Cancellation}
+
+{ol
+{- No explicit cancellation context management or tokens. These things are
+   like passing reference cells around: error prone and difficult
+   to reason about. Like concurrency we want the effect of cancellation of
+   a given asynchronous call to be aligned on function scopes.}
+{- Why does cancellation unblock {!Affect.Action.invoke}?
+   If the cancellation is due to something that the action expects, it becomes
+   a "cancelock" that waits forever. So we participate in the choice of an
+   {!Affect.Action.invoke} with an invisible action primitive that raises
+   [Cancelled] if the function marks as cancelled.}
+{- Why does cancellation "disable" actions afterwards? If we don't do
+   so, cancellation becomes a racy operation, for example if the
+   cancellation mark happens between two actions. It's good to have
+   the guarantee that if you are using actions and the asynchronous call is
+   marked as cancelled you get notified on the next action (if any,
+   {{!page-cookbook.async_funs_cancellation_blocked}be careful}).}
+{- Why is there a cancellation mask? The cleanup done on cancellation
+   may need to invoke actions without those blowing in your face with
+   {!Affect.Fun.Async.Cancelled}.}
+{- Why doesn't the cancellation mask fully mask the effects of a cancellation?
+   The cancellation mask is not supposed to be a way to escape
+   cancellation, it's only there to invoke actions during cleanup
+   without those raising {!Affect.Fun.Async.Cancelled}. Besides a
+   cancellation mask scope may be invoked regardless of cancellation and
+   we may want to be able to reason about the cancellation mark of the
+   caller in that scope.}}
+
+{2:scheduling Scheduling}
+
+{ol
+{- What's the idea behind {{!Affect.Fun.Async.Schedule.only_main}
+   only main} scheduling? In certain usage scenarios
+   it is useful to have a coordinator (UI thread, worker coordinator) among
+   available processor. This caters for these scenarios.}
+{- Why add priorities? We think it may be useful for applications
+   to make some distinctions (e.g. between a backup task and
+   interacting with humans), it may be premature design though. The
+   current implementation of affect ignores them.}}
+
+{1:names Names}
+
+{2:actions Action vs Events}
+
+Why not stick with CML's [Event] terminology?
+
+We use the term {e action} derived from
+{{:https://en.wikipedia.org/wiki/Calculus_of_communicating_systems}CCS}
+to get full Milnerization. Thinking in term of actions that you
+invoke and that return values is easier to get an intuition about than
+with the notion of event – especially for combinators like
+{!Affect.Action.guard}. Besides:
+
+{ol
+{- There's a lot of connotations for programmers about events that are
+   unrelated what it stands for in CML.}
+{- It's often (but not always) a confusing way to think about the abstraction
+   for example for combinators like {!Affect.Action.guard}.}
+{- Ambiguity between event and its instances/occurences (which also exists
+   in FRP). Here we have action for the abstraction and action invocation for
+   the instance. This is easy to relate with function abstraction
+   and function invocation which presumably programmers are familiar with.}
+{- There is already an [Event] (implementing CML events over threads) module
+   upstream.}
+{- In the CML literature itself the event abstraction is often refered to
+   as "first-class synchronization operation". In fact in the
+   {{:https://doi.org/10.1017/CBO9780511574962}CML book} on p. 53 we find
+   this sentence "The type [τ event] {b is the type of a synchronous operation}
+   that returns a value of type [τ] when it is synchronized upon" (emphasis is
+   mine). So what {e it is} is not described by the [event] name.}
+{- The Guile implementation decided to go with operation insead of event.
+   We do find operation a bit too generic and a term that can also
+   be used to characterize functions (e.g. the operations of a data
+   structure), so we did not reuse that.}}
+
+{table
+{tr {th CML} {th Affect}}
+{tr {td Event} {td {{!Affect.Action}[Action]}}}
+{tr {td [wrap]} {td {{!Affect.Action.map}[Action.map]}}}
+{tr {td [sync]} {td {{!Affect.Action.invoke}[Action.invoke]}}}
+{tr {td [poll] (primitive)}
+    {td N/A we directly [doFn] (following the Guile implementation)}}
+{tr {td [doFn] (primitive)}
+    {td {{!Affect.Action.Private.Action.Primitive.poll}
+        [Action.Primitive.poll]}}}
+{tr {td [block] (primitive)}
+    {td {{!Affect.Action.Private.Action.Primitive.block}
+        [Action.Primitive.block]}}}
+}
+
+This is not to say that event terminology never makes sense,
+especially for those actions that involve waiting on something that is
+not really under our control like waiting for readability – but it
+becomes weird when it is, like the [Port.offer] action. For those
+cases where we wait on something then [wait_xxx] is a natural way of
+naming this action of waiting on [xxx]. Sometimes we can turn that
+into a proper action for example on asynchronous function, we [get]
+the result rather than [wait_result], notably because of the set-once
+cell semantics of call handles.
+
+{2:ports Ports vs Channels}
+
+Why not stick with CML's [Channel], [send] and [recv] terminology?
+
+{ol
+{- [send] and [recv] have a remote and asynchronous transmission feel which
+   we dislike.}
+{- We find it ambiguous as to whether this is buffered or not.}
+{- Action names and their complement represent a communication port in
+   Milner's CCS – though he moved to channel terminology in the π-calculus.}
+{- A counter point could be that this is established terminology, for example
+   in Go, but we don't find the names we propose to be horribly bad.}
+{- There are already channels in the standard library for IO and those are
+   buffered.}}
+
+{table
+{tr {th CML} {th Affect}}
+{tr {td Channel} {td {{!Affect.Port}[Port]}}}
+{tr {td [send]} {td {{!Affect.Port.offer}[Port.offer]}}}
+{tr {td [recv]} {td {{!Affect.Port.take}[Port.take]}}}}
+
+{2:cells Cells}
+
+We don't find [mvar] and [ivar]'s to be particularly enlightening
+names if not contradicatory for [ivar]. We gather these synchronized
+cells in {!Affect.Cell} module with following names:
+
+{table
+{tr {th CML} {th Affect}}
+{tr {td [Mvar]} {td {{!Affect.Cell.Drop}[Cell.Drop]}}}
+{tr {td [Ivar]} {td {{!Affect.Cell.Once}[Cell.Once]}}}
+{tr {td [?]} {td {{!Affect.Cell.Lazy}[Cell.Lazy]}}}
+}
+
+{1:implementation Implementation}
+
+{2:cml_diff Differences with Parallel CML}
+
+A couple of things to note.
+
+{ol
+{-  Our primitives are slightly simpler and follow the Guile
+    implementation. We simply have an optimistic phase (poll) and a
+    pessimitic one (block). The three function design
+    ([poll], [doFn], [block]), also present in
+    {{:https://github.com/ocaml/ocaml/blob/da91f6d4d83e1d9249c49cdf53d2322557a6cb32/otherlibs/systhreads/event.ml#L17-L24}OCaml's
+implemention}, has the advantage of producing a list of
+    {e enabled} events to consider. One of the paper mentions that it
+    enables e.g. to support priorities or fairness. Except if priorities
+    are dynamically set by [poll] I think the two function design also
+    allows this: we have the list of primitive events before, it's just a
+    matter of random shuffling and/or sorting that list before processing it.}
+{-  Our implementation of ports doesn't use spinlocks like in the original
+    paper, we followed Guile and used two synchronized queues instead
+    which leads to a slightly different code structure and notably the
+    need to publish the operations on the queues before attempting
+    synchronization. We struggled however to implement
+    {!Affect.Cell.Drop} without a spinlock.}
+{-  For now we didn't implement negative acknowledgement. While they provide
+    an account of cancellation in {!Affect.Action.choose}, they do so by side
+    effect and if we use the CML API (not the OCaml one, which is rather a
+    callback), it requires to run an asynchronous functions call to handle
+    them which is slightly disasteful and may end up clashing with
+    structured concurrency (more thought is needed :-).
+    As mentioned in the papers it is possible to handle this outside the
+    current core. Basically for now when we iterate over the primitive events
+    to do the poll and block we always pass the same [continue] and [unblock]
+    functions. These should be changed for each primitive to add
+    invocations of the nacks for those other primitives that requested it.
+    So it seems that the only disruption would actually happen only internaly
+    to the [Action] module. It could change the costs of action invocations
+    though.}
+{- We couldn't really wrap our head around the "horrible continuation
+   hacking to implement" [wrap] (see section §6.4 of
+   {{:https://doi.org/10.1145/1596550.1596588}paper}). I suspect
+   that our {!Affect.Action.map}, implemented without "horrible continuation
+   hacking" is also less powerful due to the loss of context. We also dislike
+   the fact that the unblocking entities are the ones that end up invoking
+   the mapping function, we'd prefer to have the ready thunk do that back
+   on the scheduler (which would likely also solve the loss of context
+   problem).}
+{- They don't have structured concurrency. They have [spawn : (unit ->
+   unit) -> unit]. Our enforcement of structured concurrency means
+   that some of the patterns they use (a.k.a. threads everywhere) for
+   example to implement synchronization mecanisms using ports can likely not
+   be used (see for example §5.3.1 in
+   {{:https://doi.org/10.1017/CBO9780511574962}the book}).
+   Since that's precisely the style we dislike (data structures having
+   hidden threads) all the better, but we may need new books and have a
+   better assement of what is exactly lost here.}}
+
+{2:undecided Undecided and todo}
+
+{ul
+{- Unhandled exceptions on [Action.guard] [do_poll] and [do_block],
+   we throw them into the [Action.invoke], should we rather Panic and fail
+   the whole scheduler? See [XXX] in the code, it could break invariants.}
+{- Should we keep {!Affect.Action.invoke_poll}? It's one more
+   effect to handle and it tempts people into performing their
+   own scheduling. Some actions will always return [None].}
+{- The action metadata likely needs a new design round. It would
+   also be nice to look at what implicit location could bring here.}
+{- Should we add the nacks? See the discussion in {!cml_diff}.}
+{- Built-in scheduler. Priorities are not implemented. Have one queue per
+   priority? One question is how we can we adjust priorities if a low priority
+   function tries to get the
+   priority? We'd need to thread that info into actions, since
+   waiting on an asynchronous function is no longer special, it's just invoking
+   an action. Actions
+   could have a priority field not used for leaning the [choose] but to
+   indicate which priority should be given to the waiter and is returned
+   on {!Affect.Action.Private.Action.Invocation.make}.}}
+
+
+{1:refs References and acknowledgements}
+
+In some sense affect is simply an attempt at icing the cake of
+Parallel Concurrent ML with structured concurrency and structured
+cancellation. Synchronous actions are an implementation of the notion
+first-class synchronous events which can be found in the works
+mentioned below. They are just a parallel-safe and lock-free
+implementation of the OCaml [Event] module.
+
+{ul
+{- John Reppy.
+   {{:https://doi.org/10.1145/960116.54015}
+   {e Synchronous Operations as First-class Values}}. 1988
+
+   The original CML paper.}
+{- John Reppy.
+   {{:https://doi.org/10.1017/CBO9780511574962}
+    {e Concurrent Programming in ML}}. 1999
+
+    Good book on CML with lots of examples, thoughts on concurrency,
+    synchronicity and design rationales.}
+{-  Kevin Donnelly et al.
+   {{:https://doi.org/10.1017/S0956796808006916}Transactional events}.
+
+   Interesting monadic account of CML events, see also
+   {{:https://www.cs.cornell.edu/people/fluet/research/tx-events/CS257/cs257.pdf}this technical report}.}
+
+{- John Reppy et al.
+   {{:https://doi.org/10.1145/1596550.1596588}
+   {e Parallel Concurrent ML}}. 2009
+
+   Describes the protocol for parallel event synchronization.}
+{- Andy Wingo et al.
+   Guile {{:https://doc.guix.gnu.org/fibers/latest/en/html_node/}
+   fibers library}. 2017 See also
+   {{:https://wingolog.org/archives/2017/06/29/a-new-concurrent-ml}this blog
+   post}.
+
+   Guile implementation of Parallel CML. Our notion of primitive action is
+   rooted in their notion of operation where they reduce the three function
+   of Reppy 1999 to two. We also stole their implementation scheme for
+   ports which avoids spinlocks. Like them we change the terminology, but
+   did not follow theirs.}}
+
+Here are two personal notes:
+
+{ul
+{- The literature often present channels (ports in affect) as being
+   the only mean to create actions, on receive and send operations on
+   a channel. The OCaml Event implementation is an example of
+   that. This limits a bit the presention since it entails one
+   rendez-vous synchronization between two actions. First this is only
+   one of the {{!Affect.Action.synchronization_typology}many
+   synchronization modes} you may be interested in. While those can be
+   encoded on top of channels, it feels a bit weird to to so. Second
+   it makes it harder to see it as a good interaction mecanism for
+   dealing with the operating system. For the latter the synchronization
+   protocol is in fact much simpler than the two phase protocol that you need
+   in order to simulaneously synchronize two actions for implementing ports.}
+{- While the CML book is a good book we dislike the resulting very
+   imperative programming style where everything is a [unit -> unit]
+   thread and channels are use to get out information from these black holes.
+   We hope that in affect, by having structured concurrency with
+   functions [unit -> 'a] that return values that can be synchronized like a
+   set-once cell, we can put less emphasis on using "threads" and ports.
+   In fact as we noted in the last point {{!cml_diff}here}, some of
+   the patterns they use may not be feasible with affect}}
+
+
+{1:timeline Affect timeline}
+
+{2:step_2026 May 2026}
+
+{ul
+{- Fully reframe the model on parallel asynchronous function calls.  No
+   longer mention "fibers" and tuck all that in [Stdlib.Fun.Async]
+   where it naturally belongs.}
+{- Provide support for the loss of handler problem mentioned
+  {{:https://discuss.ocaml.org/t/effect-composability-actual-callstack-vs-syntactic-scope/17536}here} via {!Affect.Fun.Async.Call_handler} which allows
+  to recover a form of structured effect handling. }
+{- Replace the ad-hoc notion of blocking we had in the previous iteration
+   by CML synchronous events, which we expose under the term action. In
+   fact our previous [Fiber.block] mecanism was
+   almost the structure of a CML {{:https://github.com/ocaml/ocaml/blob/a4a0d59df82e7e11db8f20aff268b2a7e7a079e1/otherlibs/systhreads/event.ml#L17-L24}primitive event}.
+  Blocking on an asynchronous function call becomes blocking on the action to
+  get its result which is very pleasing. Provide the full
+  power of CML composable's synchronization to the system and unifies the
+  synchronization mecanism for asynchronous
+  function synchronisation, blocking on primitives (system calls) and
+  synchronization structures (ivar, mvar, ports, byoss) which where previously
+  separate and ad-hoc. For example in the previous iteration if you
+  wanted to say, cancel a function after a timeout, you had to spawn a fucntion
+  that would wait the timeout and use the ad-hoc "pick" combinator between
+  two functions. In this new system you can simply ask for the function [get] a
+  ction and choose it with a timeout primitive action which results in
+  composite action that can be waited on, so it's not optimal.}}
+
+{2:step_2024 October 2024}
 
 {ol
 {- Only expose parallel asynchronous function calls with built-in
    priority hints and structured cooperative concurrency and cancellation.
    A {e fiber} is just a handle on such a call.}
-
-{- Negations.
-
-   {ol
-   {- No distinction between parallelism and concurrency. That's not
-      something one wants to ponder at every asynchronous call. Doing so
-      is fine control over scheduling (see next point).}
-
-   {- No fine grained control on scheduling. It's not
-      compositional. Just asynchronous function calls with three
-      priority hints and request for execution on the main (UI) thread.}
-
-   {- No fiddling with domain/threads or pools thereof at the user level.
-      It's not compositional and you don't want to thread these arguments
-      in your libraries. Only the program's [main] function setups that.}
-
-   {- No fiddling with fancy concurrency primitives or models. Only
-      a simple, fixed model, allows to reasonably think about how it
-      can be exploited compositionally. It becomes possible to understand
-      the exact consequences of using an asynchronous function call in
-      your library.}
-   {- No fancy dynamic ressource tracking in the fiber's scope. This
-      belongs to my type system and [Fun.protect]. It also keeps the
-      difference between synchronous and asynchronous function call
-      small, which in turn allows to sprinkle or retract asynchronous
-      calls in your code more easily.}}}
-
-{- The model still leaves a lot of freedom to implement {e schedulers}
-   for it. A fixed model implies that it becomes possible for the
-   runtime and schedulers to optimize for it and for library authors
-   to correctly design with it.}
-
-{- Cooperative structured cancellation. More natural [await]
+{- Came up with most of the negations in {{!choices}choices}.}
+{- Priority hints and cooperative cancellation were inspired by the
+  {{:https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/}Swift concurrency model}. This ends up with a more
+    more natural [await]
    (previously [join]) than the previous 2022 iteration of [Affect] which
    only had structured cancellation topped with a franken-semi-cooperative
-   cancellation. Notably:
-   {ol
-   {-  A cancelled asynchronous function call can return partial results.}
-   {- No need to deal with {e maybe this was cancelled} when [await]ing.
-      Fibers no longer return [option]s.}
-   {- No need for the [finally] handler on fiber calls. This was needed because
-      if a fiber was cancelled before executing it would be denied any
-      execution. This is no longer the case. This alone show in my opinion
-      that the previous model was broken.}
-   {- Function calls in OCaml raise, thus it's natural for a parallel
-      asynchronous function call to raise too.}}}
-{- The {{!Fiber.concurrency_model}final model} feels just like a
-   rather natural extension of OCaml's functions calls. This is rather
-   pleasing in our functional programmer eyes.}}
+   cancellation.}
+{- Growing feeling that CML is the answer and that we are reinventing it.}}
 
-The cooperative cancellation design was taken from the
-{{:https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/}Swift concurrency model}. So was aswell the notion of
-priority (they have one more level though). The whole result is not far
-from what Swift
-propose except: we don't have [TaskGroup]s, it feels unecessary; we
-don't have detached tasks (this could easily be added); we don't have
-their "actors" which looks like their terminology for
-{{:https://en.wikipedia.org/wiki/Monitor_(synchronization)}monitors}.
+{2:step_2022 January 2022}
 
-One question that remains is if that model is not too costly for the
-OCaml runtime system for say mainly IO bound programs. Though
-given the flexibility of effects you could still elect to run for
-example one concurrency model per domain or simply on a single domain.
-
-
-{1:choices Choices}
-
-{ol
-  {- Except forcing an await in the scheduler that throws out the results in
-     order to implement structured concurrency we don't do anything with
-     fibers that are not awaited when a fiber returns. We could:
-   {ol
-      {- Report errors, that is enforce an await all your asynchrounous calls
-         discipline.}
-      {- Do nothing on values but trap exceptions.}}
-   The first idea may make some pattern for speculative computing
-   more involved that they could be: just cancel
-   and forget, no need to await. The second idea it feels a bit
-   odd to make a difference between values and exceptions, I think
-   the stance should rather be either we disallow it or we don't care.
-   We could have a scheduler tracing mode that reports them but if
-   people start using as a design property (e.g. the forget mentioned)
-   it would a noisy signal.}}
+First design round.

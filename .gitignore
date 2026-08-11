@@ -2,3 +2,4 @@ _b0
 _build
 tmp
 *.install
+test/bench/*.json

@@ -1,1 +1,1 @@
-(srcs-x test test-evloop pkg attic)
+(srcs-x pkg attic)

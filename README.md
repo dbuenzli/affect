@@ -1,21 +1,27 @@
-Affect — Concurrency and parallelism for OCaml 5
-================================================
+Affect — Streamlined and natural concurrency model for OCaml
+==============================================================
 
-Affect is a streamlined and natural [concurrency model] for OCaml 5.
-It just provides parallel asynchronous function calls with structured
-cooperative concurrency and cancellation.
+Affect is a streamlined and natural concurrency model for OCaml.
 
-Affect is distributed under the ISC license. It has no dependencies.
+It provides parallel asynchronous functions and first-class
+synchronous actions to orchestrate them. The resulting [concurency
+model] has structured cooperative concurrency, structured cancellation
+and structured effect handling.
 
-Homepage: <https://erratique.ch/software/affect>  
+Affect is distributed under the ISC license. The base library has no
+dependencies. It optionally depends on the [`cmdliner`] library and
+the OCaml `unix` library.
 
-[concurrency model]: https://erratique.ch/software/affect/doc/Fiber/index.html#concurrency_model
+Homepage: <https://erratique.ch/software/affect/>
+
+[`cmdliner`]: <http://erratique.ch/software/cmdliner>
+[concurrency model]: https://erratique.ch/software/affect/doc/concurrency_model.html
 
 ## Installation
 
 Affect can be installed with `opam`: 
 
-    opam pin add affect https://erratique.ch/repos/affect.git
+    opam install affect
 
 If you don't use `opam` consult the [`opam`](opam) file for build
 instructions.
@@ -30,16 +36,13 @@ than on the issue tracker.
 [doc]: https://erratique.ch/software/affect/doc/
 [ocaml-forum]: https://discuss.ocaml.org/
 
-## Sample code
+## Examples
 
-A few basic sample programs can be found in the [test](test/)
-directory.
+A few examples can be found in the [test](test/) directory. 
 
-* [`ping.ml`](test/ping.ml), client and server using `Funix` to 
-  do useless networking on your machine.
-* [`mouse.ml`](test/mouse.ml), proof of concept interfacing 
-  with the SDL event loop.
-* [`happy_eyeballs.ml`](test/happy_eyeballs.ml), an implementation
-  of a happy eyeballs 
+## Acknowledgements 
 
-You can run them with `b0 -- ping` or `b0 -- mouse`.
+A grant from the [OCaml Software Foundation] helped to bring the first
+public release of `affect`.
+
+[OCaml Software Foundation]: http://ocaml-sf.org/

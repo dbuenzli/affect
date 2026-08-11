@@ -1,5 +1,16 @@
 true : bin_annot, safe_string
 <_b0> : -traverse
 <src> : include
+<src/**> : no_alias_deps
+<src/*> : package(threads)
+
+<src/tmp> : include
+<src/tmp/*> : package(unix)
+
 <src/unix> : include
-<src/unix/**> : package(unix)
+<src/unix/*> : package(unix)
+<src/unix/affect_unix.{cma,cmxa}> : record_affect_unix_stubs
+<src/unix/affect_unix.cmxs> : link_affect_unix_stubs
+
+<src/cli> : include
+<src/cli/**> : package(cmdliner)

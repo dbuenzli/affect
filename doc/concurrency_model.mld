@@ -1,0 +1,102 @@
+{0 Affect concurrency model}
+
+Affect provides parallel asynchronous functions and first-class
+synchronous actions to orchestrate them.
+
+An asynchronous function is a regular OCaml function. It only differs
+in how it is called and how it returns its result. We use the term
+asynchronous function for what is often an asynchronous
+{e function call}.
+
+Here is the model in a nutshell:
+
+{ol
+{- Asynchronous functions are structured on function scopes.
+
+   If a function makes an {{!Affect.Fun.Async.call}asynchronous
+   function call}, the call is scheduled concurrently and the caller
+   continues immediately but when it reaches the end of its body
+   it does not return before the asynchronous call does.}
+
+{- Asynchronous functions are oblivious of their scheduling.
+
+   No distinction between concurrency and parallelism can be made.
+   Execution can be serialized or parallelized on an arbitrary number
+   of domains depending on how the main program configures the
+   system. Except for requests to be executed only on the main domain
+   of the scheduler and prioritization hints, no assumption can be
+   made on how they are scheduled by the running program. }
+
+{- Asynchronous functions have {{!Affect.Fun.Async.Schedule.type-priority}
+   priorities}.
+
+   By default, asynchronous functions inherit the priority of their
+   caller. Priorities are scheduling {e hints}, they can be ignored or
+   dynamically changed by the scheduler. For example to avoid priority
+   inversion when completion of a low priority call blocks a high
+   priority call.}
+
+{- Asynchronous functions are cooperatively scheduled.
+
+   They must progress. If they are unable to do so they must either
+   {{!Affect.Fun.Async.yield}yield} control or block by
+   invoking a {{!Affect.Action.basics}synchronous action}. The
+   function execution resumes once it is rescheduled or the action
+   invocation synchronizes. Libraries can devise synchronous actions for
+   asynchronous primitives and invoke them in regular functions to provide
+   direct-style, seemingly blocking functions.}
+
+{- Asynchronous functions have a {{!Affect.Fun.Async.Call_handler}call
+   handler}.
+
+   The call handler wraps the asynchronous function call and is
+   propagated and composed with the call handler of descendent
+   asynchronous functions calls. It can be used to setup effect
+   handlers so that effect handling is structured on function
+   scopes. The handler however must be synchronization safe as it can
+   be invoked in parallel.}
+
+{- The return value of an asynchronous function call is obtained by invoking
+   a synchronous action.
+
+   Each asynchronous function has {{!Affect.Fun.Async.get'}an action}
+   which when invoked synchronizes whenever the function's return value or
+   exception is available.}
+
+{- Asynchronous functions can be {{!Affect.Fun.Async.section-cancelling}
+   marked} for cancellation.
+
+   A cancellation mark is permanent and cannot be reverted.}
+
+{- Asynchronous function cancellation is structured on function scopes.
+
+   When an asynchronous function is marked as cancelled, its own
+   current and future asynchronous calls are also immediately marked
+   as cancelled.}
+
+{- Asynchronous function cancellation disables synchronous actions.
+
+   If an asynchronous function is blocked on a synchronous action or
+   tries to invoke one, it immediately synchronizes by raising the
+   {{!Affect.Fun.Async.Cancelled}[Cancelled]} exception unless
+   the invocation is made in an explicit scope that
+   {{!Affect.Fun.Async.masking}masks} the
+   cancellation.}
+
+{- Asynchronous function cancellation is cooperative.
+
+   An asynchronous function gets notified by an action invocation that
+   it was cancelled however if it doesn't invoke actions it's up to
+   function to {{!Affect.Fun.Async.checking}check} for
+   cancellation. It is also up to the function to decide what it wants
+   to do about the cancellation. For example it can simply return a
+   partially computed result. If that doesn't make sense it is
+   recommended to terminate the function as quickly as possible by
+   releasing the resources it holds and return by raising
+   {{!Affect.Fun.Async.Cancelled}[Cancelled]}. This compose well
+   with the behaviour of actions on cancellation and can be naturally
+   achieved by following the [Fun.protect] and
+   {{!Affect.Fun.Async.protect}[Fun.Async.protect]} discipline.}  }
+
+Some justifications about these decisions can be found in the
+{{!page-design}design notes}.

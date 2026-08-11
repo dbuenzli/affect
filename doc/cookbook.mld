@@ -1,0 +1,486 @@
+{0 Affect cookbook}
+
+A few recipes and starting {{!blueprints}blueprints} for using {!Affect}.
+
+{b Note.} Some of the code snippets here assume they are done after:
+
+{[
+open Affect
+]}
+
+{1:conventions Conventions}
+
+{2:convention_action_naming Naming actions and direct style functions}
+
+Given an abstract operation {e op} in a module [M] we define an action
+named [M.op'] for it. In addition we define a direct style function
+[M.op] that simply {!Affect.Action.invoke}s the action. See a
+{{!blueprint_action}blueprint}. If the action is only related to the
+direct style function and has a different name, it's fine to drop the
+prime in the acton. See for example {!Affect_unix.Unix.wait_readable}
+and {!Affect_unix.Unix.read}.
+
+{2:convention_action_waiting Signature for waiting actions}
+
+When your action is waiting for an outcome or synchronizes with [()],
+it's often more useful to let the user provide a tag for the
+synchronization value rather than [()]. This makes it easier to
+compose it with {!Affect.Action.choose} without having to
+{!Affect.Action.map} too much.  This leads to this kind of signature:
+{[
+val M.wait_outcome : t -> 'a -> 'a Action
+(** [wait_outcome v tag] the action that waits for outcome on [v]. An action
+    invocation is enabled and synchronizes with [tag] when outcome happens
+    on [v]. *)
+]}
+See for example {!Affect.Fun.Async.wait_cancelled},
+{!Affect.Port.offer'}, etc.
+
+{1:basics Basics}
+
+{2:basics_main How do I structure the main function of my program?}
+
+The simplest is have a toplevel call to {!Affect.Fun.Async.main} at the
+beginning of your main function. That way your [main] becomes the root
+asynchronous function and everything becomes affect ready (except
+computations that occur during module initialization).
+
+{[
+let main () = Fun.Async.main @@ fun () -> 0
+let () = if !Sys.interactive then () else exit (main ())
+]}
+
+See also the {{!blueprints}blueprints}.
+
+{2:basic_control How do I control the number of parallel domains?}
+
+The [domain_count] optional argument of {!Affect.Fun.Async.main} can be used
+to control the number of parallel domain at startup. For end-user
+interaction see the {!Affect_cli.parallel_count} command line argument.
+
+See also {{!blueprint_with_cli}this blueprint}.
+
+{2:basics_work_items How can I divide work for parallel processing?}
+
+The {!Affect.Fun.Async.parallel_count} and
+{!Affect.Fun.Async.parallel_worker_count} functions return the number
+of parallel processors that are available in the scope of
+invocation and can be used used to size work items.
+
+The {!Affect.Fun.Async.divide_work} is a helper function to determine
+batches of work if you have [size] elements to divide among
+[worker_count] workers. Here's an example:
+
+{[
+let array_parallel_map_inplace : ('a -> unit) -> 'a array -> unit =
+fun f a ->
+  Fun.Async.get @@ Fun.Async.call @@ fun () ->
+  let size = Array.length a in
+  let worker_count = Fun.Async.parallel_worker_count () in
+  let worker_count, range = Fun.Async.divide_work ~size ~worker_count in
+  for w = 0 to worker_count - 1 do
+    Fun.Async.call_trap_exn @@ fun () ->
+    let first, last = range w in
+    for i = first to last do a.(i) <- f a.(i) done
+  done
+]}
+
+{2:basics_exn How can I avoid silent unhandled exceptions?}
+
+In general it's a good idea to always {!Affect.Fun.Async.get} an
+asynchronous function. That way if it raises, the exception is
+propagated to the [get] caller. However for imperative parallel work
+you may want to simply rely on structured concurrency to synchronize
+worker functions.
+
+In this case you should invoke worker functions with
+{!Affect.Fun.Async.call_trap_exn}. This ensures that if an unhandled
+exception occurs, it gets witnessed by the
+{!Sys.default_uncaught_exception_handler} exception trap.
+
+{2:basics_effects How can I use effects in my code?}
+
+{{!Affect.Fun.Async.Call_handler}Call handlers} allow to use your own
+effects in a structured way that aligns on function scopes. There is
+however one constraint: your call handlers must be synchronization
+safe, they may end up being executed in parallel.
+
+Here is a simple example:
+
+{[
+type _ Effect.t += Incr : unit Effect.t
+let incr () = Effect.perform Incr
+let make_counter () =
+  let c = Atomic.make 0 in
+  let handle f = match f () with
+  | v -> v
+  | effect Incr, k -> Atomic.incr c; Effect.Deep.continue k ()
+  in
+  c, Fun.Async.Call_handler.{handle}
+
+let () =
+  let c0, handle_c0 = make_counter () in
+  let c1, handle_c1 = make_counter () in
+  Fun.Async.main ~handler:handle_c0 @@ fun () ->
+  incr ();
+  let f = Fun.Async.call @@ fun () ->
+    incr ();
+    Fun.Async.call_trap_exn ~handler:handle_c1 (fun () -> incr ());
+    incr ();
+  in
+  incr ();
+  Fun.Async.get f;
+  assert (Atomic.get c0 = 4 && Atomic.get c1 = 1);
+  ()
+]}
+
+Note that in the function that uses the [handle_c1], the parent
+handler [handle_c0] is still in scope. But in this case the effect
+handling is taken by [handle_c1]. Would that not be the case it would
+trickle up to the [handle_c0] installd by the root asynchronous function.
+
+{2:basics_repl How can I use affect in the OCaml toplevel (REPL)?}
+
+There doesn't seem to be support in the OCaml toplevel to install
+effect handlers so it's all a bit hackish. But it's possible to wrap a
+new call to [Toploop.loop] (whose global effects are not entirely
+clear, some stuff seems to be reset afterwards). Don't be surprised if
+you get greeted again and have to exit twice.
+
+The following is known to work with the [ocaml] toplevel and
+{{:https://erratique.ch/software/down/}[down]} (it doesn't seem to work in
+[utop] but the latter loads a lot of stuff behind the scene which I suspect
+is not too compatible anyways). We also recommend using
+{{:https://erratique.ch/software/omod/doc/}[omod]} since it's less
+steps. We show directly how to load the unix support. You can also just
+load the base library the same way.
+
+{ul
+{- With [omod]:
+{[
+Omod.load "Affect_unix";; affect_unix_top ();;
+(* you will be greeted again *)
+affect_toggle_tracing ();; (* optional of course *)
+]}}
+{- With [ocamlfind] (note cut and paste the four first directives on a
+   single line):
+{[
+#require "affect.unix";; #use "affect_top_init.ml";; #use "affect_unix_top_init.ml";; affect_unix_top ();;
+(* you will be greeted again *)
+affect_toggle_tracing ();; (* optional of course *)
+]}}}
+
+Note that since when we are waiting on the prompt we perform blocking
+input in the root asynchronous function which you are not supposed to do,
+this may lead to slightly odd behaviours of you play with the timers For
+example to unblock the timer here you'll need a yield:
+
+{[
+# let f = Fun.Async.call @@ fun () ->
+  Mtime.wait_for Mtime.Span.(1 * s); print_endline "hey!";;
+[00 λ0142] calls λ017e
+[09      ] resume
+[09 λ017e] continue
+[09 λ017e] block on Mtime.wait_for 1.0s
+[09      ] poll unblocker
+[09      ] resume
+[09      ] sleep
+val f : unit Affect.Fun.Async.t = λ017e
+# Fun.Async.yield ()
+…
+]}
+
+Perhaps we could try to find an alternate way here like running the prompt
+in a separate regular thread.
+
+{1:actions Actions}
+
+{2:actions_what What is an action exactly?}
+
+The {{!Affect.Action.basics}basics of actions} tries to answer that
+question.
+
+{2:actions_howto_define How can I define my own primitive actions?}
+
+The {!Affect.Action.Private.Action.Primitive} module provides support
+to implement your own action primitives.
+
+If your primitive is just a
+{{!Affect.Action.synchronization_typology}waiter or single-shot}
+action, it won't be too complex, but it's likely a good idea to look
+how simple actions like {!Affect.Cell.Once.get} are implemented.
+
+If you need to synchronize two actions for a rendez-vous, that becomes
+slightly more complicated as you need to implement a two stage
+protocol and take care of not synchronizing with yourself if that's
+possible. Have a look at the implementation of {!Affect.Port}
+and the documentation of {!Affect.Action.Private.Action.Blocked}.
+
+{2:actions_own_handling How can I use actions without {!Affect.Fun.Async}?}
+
+Formally actions do not depend on affect's asynchronous functions and
+the built-in {!Affect.Fun.Async.main} scheduler. They are implemented
+over atomic references and thus synchronization safe. You code needs
+however to handle two effects appropriately. See
+{{!Affect.Action.Private.Action.effects}these private definitions} for
+more information.
+
+The {{:https://github.com/dbuenzli/affect/blob/master/test/test_thread.ml}
+[test_thread.ml]} source shows how you can handle actions in a thread
+and use them to synchronize with another thread or with asynchronous
+functions that run in a separate {!Affect.Fun.Async.main} call.
+
+{1:async_funs Asynchronous functions}
+
+{2:async_funs_call How can I call an asynchronous function?}
+
+Just like that:
+
+{[
+let f = Fun.Async.call @@ fun () -> cos Float.pi
+]}
+
+{2:async_funs_get How can I get the result of an asynchronous function?}
+
+Just like that:
+
+{[
+let f = Fun.Async.call @@ fun () -> cos Float.pi
+let cos_pi = Fun.Async.get f
+]}
+
+Note that the {!Affect.Fun.Async.get} call cooperatively blocks your function
+until the asynchronous function call returns.
+
+{2:async_funs_not_returning Why is my function not returning?}
+
+Like functions that call functions, functions that call
+asynchronous funtions do not return before all these have returned. So
+if one of these asynchronous function calls never returns you won't
+either. In the functon [f] below the second function blocks forever
+since no one is able to take the its offer on [p]. For this reason a call
+to [f ()] blocks forever (unless {{!Affect.Fun.Async.cancellation}cancelled}).
+
+{[
+let f () =
+  Fun.Async.call @@ fun () ->
+  let p = Port.make () in
+  ignore @@ Fun.Async.call (fun () -> Port.offer p 34);
+  ignore @@ Fun.Async.call (fun () -> Port.offer p (Port.take p))
+  "Please return"
+
+let main () = Fun.Async.main @@ fun () ->
+  Fun.Async.get (f ()) (* blocks forever *)
+]}
+
+The easiest way of diagnosing these kind of blocked functions is by
+{{!async_funs_trace}tracing} the activity of asynchronous functions.
+
+{2:async_funs_cancellation_blocked
+Why is my function not returning from cancellation?}
+
+As mentioned in the {{!concurrency_model}concurrency model},
+cancellation is cooperative, so even if a function is aware of
+cancellation remember that it may always elect to ignore it.
+
+If the function is under your control there are only two ways for your
+function to be informed of cancellation:
+
+{ol
+{- Via an explicit call to {!Affect.Fun.Async.check_cancellation} or
+   {!Affect.Fun.Async.is_current_cancelled}.}
+{- Your function is blocked on an {!Affect.Action.invoke} call,
+   either directly or indirectly by calling a function that invokes
+   it. In this case the call raises with
+   {!Affect.Fun.Async.Cancelled} if a cancellation occurs during the
+   invocation.}}
+
+Regarding 1. this means that if you are making CPU-only intensive
+computations you should periodically check for cancellation. For
+example, in a loop:
+{[
+for i = 0 to max do
+  (if i mod some_appropriate_number = 0 then Fun.Async.check_cancellation ());
+  …
+done
+]}
+
+Regarding 2. you should be careful about the assumptions you make on
+functions that you know invoke {!Affect.Action.invoke}. They may
+not always to do so. For example, in this loop:
+
+{[
+for i = 0 to max do
+   (* WRONG: the next line may or may not raise on cancellation *)
+   let v = Cell.Once.get cache in
+   …
+done;
+]}
+
+The problem with the above loop is that a call to
+{!Affect.Cell.Once.get} no longer invokes the {!Affect.Cell.Once.get'}
+action after the cell is set as there is no need to do so. This also
+happens for functions like {!Affect_unix.Unix.read} which
+optimistically calls {!Unix.read} and only blocks by invoking
+{!Affect_unix.Unix.wait_readable} if the call returns [EWOULDBLOCK] or
+[EAGAIN].
+
+The take away is to be careful when you have long running loops. It's
+always a good idea to periodically have a call to
+{!Affect.Fun.Async.check_cancellation}.
+
+{2:async_funs_cancelled_actions
+  How can I avoid action invocations raising [Cancelled]?}
+
+When a function is cancelled all direct and indirect calls to
+{!Affect.Action.invoke} raise {!Affect.Fun.Async.Cancelled}. This can be
+prevented in a given scope by having a call to
+{!Affect.Fun.Async.mask_cancellation}.
+
+You should not use that as a mean to escape cancellation though. Use it if:
+
+{ul
+{- You need to invoke actions that need to execute uncancelled to maintain
+   an invariant.}
+{- You need to perform cancellation cleanup operations that use
+   actions before returning. See also {!Affect.Fun.Async.protect}
+   which automatically masks cancellation in the [finally].}}
+
+{2:async_funs_trace How can I trace asynchronous function activity?}
+
+The {!Affect.Fun.Async.Trace} has basic tracing capabilities. It can be
+quickly setup by adding at the top of your source:
+
+{[
+let () = Fun.Async.Trace.(set_reporter (only_fun stderr_reporter))
+]}
+
+You can add your own traces to these reports by calling
+{!Affect.Fun.Async.trace}.
+
+If you want a more principled approach to selectively enable tracing
+in your program use the {!Affect_cli.parallel_trace} command line
+argument. See {{!cookbook.blueprint_with_cli}this blueprint}.
+
+{2:async_funs_own_scheduler How can I schedule asynchronous functions myself?}
+
+If you want to schedule asynchronous functions without using the
+built-in {!Affect.Fun.Async.main} scheduler there are a
+{{!Affect.Fun.Async.Private.Async_fun.effects}couple of effects} you have to
+handle appropriately. You also need to {{!actions_own_handling}handle
+actions} since asynchronous functions use them to return their
+results. See {!Affect.Fun.Async.Private.Async_fun} for more information.
+
+The
+{{:https://github.com/dbuenzli/affect/blob/master/test/test_thread.ml}
+[test_thread.ml]} source shows how you can write a handler for
+asynchronous functions that run in a single thread without parallelism
+and how they can even synchronizes with asynchronous functions that
+run in a separate {!Affect.Fun.Async.main} call.
+
+
+{1:system_call System calls}
+
+{2:system_call_io How can I interact with the operating system?}
+
+A bare {!Affect.Fun.Async.main} has no support for cooperatively
+interacting with operating system. If you call blocking operating
+system function calls it blocks the asynchronous function call on the
+domain which runs it and may prevents other asynchronous functions from
+running, especially if your scheduler is configured with a single domain.
+
+The {!Affect_unix.Unix} library provides a cooperative interface to
+some of the OCaml {!Unix} module aswell as the ability to wait for
+monotonic time durations with {!Affect_unix.Mtime.wait_for} or until specific
+points of POSIX time with {!Affect_unix.Ptime.wait_until}.
+
+To use the library you must create a primitive action unblocker with
+{!Affect_unix.Unix.unblocker} and pass it to your
+{!Affect.Fun.Async.main} invocation. Alternatively you can simply call
+{!Affect_unix.Unix.main} instead of {!Affect.Fun.Async.main}.
+
+{2:system_call_myself How can I interact with the operating system myself?}
+
+{{!actions_howto_define}Primitive actions} are the mecanism with which
+you can cooperatively block on systems calls. You also need to
+devise an {!Affect.Action.Private.Action.Unblocker} so that it can
+be used by the scheduler of {!Affect.Fun.Async.main}. Hints can be
+taken from looking at the implementation of
+{!Affect_unix.Unix.unblocker}.
+
+{1:blueprints Blueprints}
+
+{2:blueprint_minimal Minimal}
+
+This blueprint always runs with {!Domain.recommended_domain_count}
+domains.
+
+{[
+open Affect
+let main () = Fun.Async.main @@ fun () -> 0
+let () = if !Sys.interactive then () else exit (main ())
+]}
+
+If you want to use system calls and wait for passing time, link
+against the [affect.unix] library and this will do:
+
+{[
+open Affect
+open Affect_unix
+let main () = Unix.main @@ fun () -> Mtime.wait_for Mtime.Span.(2*ms); 0
+let () = if !Sys.interactive then () else exit (main ())
+]}
+
+{2:blueprint_with_cli With the [affect.cli] library}
+
+This blueprint adds an option to your tool to specify the number
+domains via {!Affect_cli.parallel_count} and another one to enable
+tracing on stderr with {!Affect_cli.set_parallel_trace}.
+
+To make the example ready for system interaction [open ]{!Affect_unix} at
+the top and replace
+{{!Affect.Fun.Async.main}[Fun.Async.main]} by
+{{!Affect_unix.Unix.main}[Unix.main]}.
+
+{[
+open Affect
+
+let tool ~domain_count =
+  Fun.Async.main ?domain_count @@ fun () ->
+  0
+
+open Cmdliner
+open Cmdliner.Term.Syntax
+
+let tool_cmd =
+  Cmd.make (Cmd.info "TODO" ~version:"%%VERSION%%") @@
+  let+ domain_count = Affect_cli.parallel_count ()
+  and+ () = Affect_cli.set_parallel_trace () in
+  tool ~domain_count
+
+let main () = Cmd.eval' tool_cmd
+let () = if !Sys.interactive then () else exit (main ())
+]}
+
+{2:blueprint_action Defining actions}
+
+This blueprint shows how to define an action for an {e op} operation
+in a module [M].
+
+{[
+module M : sig
+  val op : unit -> 'a
+  (** [op ()] blocks until <condition>, <effect> and continues with <value>. *)
+
+  val op' : 'a Action.t
+  (** [op'] is the action for {!op}. An action invocation is enabled when
+      <condition> and it synchronizes with <value> [if <condition>]. *)
+end = struct
+  open Action.Private
+  let op_poll ~continue = failwith "TODO"
+  let op_block ~blocked = failwith "TODO"
+  let op_meta = Action.Meta.make ~name:"M.op" ()
+  let op' = Action.Primitive.make ~meta:op_meta ~poll:op_poll ~block:op_block
+  let op () = Action.invoke op'
+end
+]}

@@ -1,17 +1,44 @@
-description = "Concurrency and parallelism for OCaml 5"
+description = "Streamlined and natural concurrency model for OCaml"
 version = "%%VERSION_NUM%%"
-requires = ""
+requires = "threads"
 archive(byte) = "affect.cma"
 archive(native) = "affect.cmxa"
 plugin(byte) = "affect.cma"
 plugin(native) = "affect.cmxs"
 exists_if = "affect.cma affect.cmxa"
 
+package "cli" (
+  directory = "cli"
+  description = "The affect.cli library"
+  version = "%%VERSION_NUM%%"
+  requires = "cmdliner affect"
+  exports = "affect"
+  archive(byte) = "affect_cli.cma"
+  archive(native) = "affect_cli.cmxa"
+  plugin(byte) = "affect_cli.cma"
+  plugin(native) = "affect_cli.cmxs"
+  exists_if = "affect_cli.cma affect_cli.cmxa"
+)
+
+package "tmp" (
+  directory = "tmp"
+  description = "The affect.tmp library"
+  version = "%%VERSION_NUM%%"
+  requires = "affect.unix affect"
+  exports = "affect affect.unix"
+  archive(byte) = "affect_tmp.cma"
+  archive(native) = "affect_tmp.cmxa"
+  plugin(byte) = "affect_tmp.cma"
+  plugin(native) = "affect_tmp.cmxs"
+  exists_if = "affect_tmp.cma affect_tmp.cmxa"
+)
+
 package "unix" (
   directory = "unix"
   description = "The affect.unix library"
   version = "%%VERSION_NUM%%"
   requires = "unix affect"
+  exports = "affect unix"
   archive(byte) = "affect_unix.cma"
   archive(native) = "affect_unix.cmxa"
   plugin(byte) = "affect_unix.cma"

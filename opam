@@ -1,28 +1,40 @@
 opam-version: "2.0"
 name: "affect"
-synopsis: "Concurrency and parallelism for OCaml 5"
+synopsis: "Streamlined and natural concurrency model for OCaml"
 description: """\
-Affect is a streamlined and natural [concurrency model] for OCaml 5.
-It just provides parallel asynchronous function calls with structured
-cooperative concurrency and cancellation.
+Affect is a streamlined and natural concurrency model for OCaml.
 
-Affect is distributed under the ISC license. It has no dependencies.
+It provides parallel asynchronous functions and first-class
+synchronous actions to orchestrate them. The resulting [concurency
+model] has structured cooperative concurrency, structured cancellation
+and structured effect handling.
 
-Homepage: <https://erratique.ch/software/affect>  
+Affect is distributed under the ISC license. The base library has no
+dependencies. It optionally depends on the [`cmdliner`] library and
+the OCaml `unix` library.
 
-[concurrency model]: https://erratique.ch/software/affect/doc/Fiber/index.html#concurrency_model"""
+Homepage: <https://erratique.ch/software/affect/>
+
+[`cmdliner`]: <http://erratique.ch/software/cmdliner>
+
+[concurrency model]: https://erratique.ch/software/affect/doc/concurrency_model.html"""
 maintainer: "Daniel Bünzli <daniel.buenzl i@erratique.ch>"
 authors: "The affect programmers"
 license: "ISC"
-tags: ["effects" "concurrency" "parallelism" "fibers" "org:erratique"]
+tags: ["effects" "concurrency" "parallelism" "fibers" "org:erratique" "cml"]
 homepage: "https://erratique.ch/software/affect"
 doc: "https://erratique.ch/software/affect/doc"
 bug-reports: "https://github.com/dbuenzli/affect/issues"
 depends: [
-  "ocaml" {>= "5.3.0"}
+  "ocaml" {>= "5.5.0"}
   "ocamlfind" {build}
   "ocamlbuild" {build}
-  "topkg" {build & >= "1.0.3"}
+  "topkg" {build & >= "1.1.0"}
+]
+depopts: ["cmdliner"]
+conflicts: [
+  "cmdliner" {< "2.0.0"}
 ]
 build: ["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]
 dev-repo: "git+https://erratique.ch/repos/affect.git"
+x-maintenance-intent: ["(latest)"]
