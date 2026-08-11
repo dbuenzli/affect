@@ -1,4 +1,4 @@
-v0.1.0 YYYY-MM-DD Loc
+v0.0.0 2026-08-12 Zagreb
 ------------------------
 
 First release.

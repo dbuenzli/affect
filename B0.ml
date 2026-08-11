@@ -149,9 +149,10 @@ let default =
     |> ~~ B0_meta.issues "https://github.com/dbuenzli/affect/issues"
     |> ~~ B0_meta.description_tags
       ["effects"; "concurrency"; "parallelism"; "fibers"; "org:erratique";
-       "cml"]
+       "cml"; "unix"]
     |> ~~ B0_opam.build
-      {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"]]|}
+      {|[["ocaml" "pkg/pkg.ml" "build" "--dev-pkg" "%{dev}%"
+          "--with-cmdliner" "%{cmdliner:installed}%"]]|}
     |> ~~ B0_opam.depopts ["cmdliner", ""]
     |> ~~ B0_opam.conflicts [ "cmdliner", {|< "2.0.0"|}]
     |> ~~ B0_opam.depends
