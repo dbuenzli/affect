@@ -282,12 +282,6 @@ module Fun : sig
         them using actions, same holds for another domain or thread as long
         as it knows how to handle actions.
 
-        However for now you should not try to use
-        actions to communicate bewteen the two realms or to communicate between
-        a [main] and a thread or a domain. This limitation will be lifted
-        in the future, see the {{:https://github.com/dbuenzli/affect/issues}
-        issue tracker}.
-
         {b OCaml runtime asynchronous exceptions.} OCaml runtime
         asynchronous exceptions are left to flow to the top level of the
         domain scheduler loops. At that point for {!Sys.Break} we cancel
