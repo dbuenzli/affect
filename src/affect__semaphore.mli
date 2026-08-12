@@ -6,7 +6,7 @@
 (** Semaphores.
 
     A semaphore with capacity [n] throttles access to a ressource with
-    limited [n].
+    limited capacity [n].
 
     {ul
     {- An {!acquire} blocks until the semaphore's value can be

@@ -33,7 +33,7 @@ let fun_nop () = ()
    trying to push it on a random local queue which would result in an illegal
    concurrent access to the queue.
 
-   For scheduling each main thread of the domain of the scheduler does the
+   For scheduling each main thread of domains part of the scheduler do the
    following:
 
    0. If it's the main domain, try to find work in the [main_only] queue.
