@@ -33,7 +33,7 @@ let fun_nop () = ()
    trying to push it on a random local queue which would result in an illegal
    concurrent access to the queue.
 
-   For scheduling each (main thread of) domain of the scheduler does the
+   For scheduling each main thread of the domain of the scheduler does the
    following:
 
    0. If it's the main domain, try to find work in the [main_only] queue.
@@ -66,11 +66,12 @@ type t =
        [Domain_local.index]. The main domain is at index [0]. *)
 
     only_main_queue : ready Synchronized_queue.t;
-    (* FIFO queue for those calls that are only scheduled on the main queue. *)
+    (* FIFO queue for those calls that are only scheduled on the main domain. *)
 
     external_queue : ready Synchronized_queue.t;
-    (* FIFO queue for those calls that are scheduled by external computational
-       activities. *)
+    (* FIFO queue for those calls that are scheduled by action invocations
+       unblocked by external computational activities (other schedulers,
+       domains or threads). *)
 
     active_count : int Atomic.t;
     (* Number of domains which are in the Running state and not
@@ -82,7 +83,7 @@ type t =
        again without being removed. *)
 
     unblocker : Action.Unblocker.t;
-    (* The primitive action unblocker. *)
+    (* The primitive action invocations unblocker. *)
 
     blocked_on_unblocker : domain_local Atomic.t;
     (* Different from [Domain_local.none] if that domain has called its local
