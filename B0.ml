@@ -131,7 +131,7 @@ let bench_mandelbrot =
   let* exe = B0_env.unit_exe_file_cmd env mandelbrot in
   let cmd = Cmd.(exe % "-p" %% int 750 % "-m" %% int 250) in
   let cwd = B0_env.scope_dir env in
-  let out = Fpath.(cwd / "test" / "bench" / "mandelbrot.json") in
+  let out = Filepath.(cwd / "test" / "bench" / "mandelbrot.json") in
   let bench = hyperfine_scan_domain_count cmd ~out in
   Ok (Os.Exit.execv ~cwd bench)
 
