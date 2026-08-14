@@ -42,7 +42,7 @@ let uerror = Unix.error_message
 let rec connect fd addr = try Unix.connect fd addr with
 | Unix.Unix_error (EINTR, _, _) -> connect fd addr
 
-let rec accept fd = try Unix.accept fd with
+let rec accept fd = try Unix.accept ~cloexec:true fd with
 | Unix.Unix_error (EINTR, _, _) -> accept fd
 
 let set_nonblock ~nonblock fd =

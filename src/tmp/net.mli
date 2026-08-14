@@ -183,7 +183,8 @@ module Listener : sig
   val accept : t -> (Connection.t, string) result
   (** [accept l] offers a connection on [l]. Blocks until a client
       connects. If a connection is returned, it must always eventually
-      be closed with {!Connection.close_noerr}. *)
+      be closed with {!Connection.close_noerr} and its underlying
+      file descriptor has [cloexec] set to [true]. *)
 
   (** {2:actions Actions} *)
 
