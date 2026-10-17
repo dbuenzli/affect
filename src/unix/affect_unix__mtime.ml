@@ -127,12 +127,12 @@ open Affect
 open Affect.Action.Private
 
 let wait_for_poll start span tag ~continue =
-  if count start >= span
+  if compare (count start) span >= 0
   then Some (continue (Action.Result.Value tag))
   else None
 
 let wait_for_block start span tag ~blocked =
-  if count start >= span then
+  if compare (count start) span >= 0 then
     Action.Blocked.synced_unblock ~candidate:(Action.Result.Value tag) blocked
   else
   let timeline = Affect_unix__timeline.get_domain_local () in
