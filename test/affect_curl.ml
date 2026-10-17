@@ -71,7 +71,7 @@ let add_fd_actions fds acc =
   | Curl.Multi.POLL_NONE | Curl.Multi.POLL_REMOVE -> assert false
   | Curl.Multi.POLL_IN -> add_read fd acc
   | Curl.Multi.POLL_OUT -> add_write fd acc
-  | Curl.Multi.POLL_INOUT -> add_read fd (add_read fd acc)
+  | Curl.Multi.POLL_INOUT -> add_read fd (add_write fd acc)
   in
   Fdmap.fold add_fd fds acc
 
