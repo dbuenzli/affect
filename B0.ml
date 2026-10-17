@@ -14,6 +14,8 @@ let affect_cli = B0_ocaml.libname "affect.cli"
 let affect_tmp = B0_ocaml.libname "affect.tmp"
 let cmdliner = B0_ocaml.libname "cmdliner"
 
+let curl = B0_ocaml.libname "curl" (* For testing *)
+
 (* Libraries *)
 
 let affect_lib =
@@ -110,6 +112,12 @@ let cookbook =
 let ping =
   let requires = [affect; affect_unix] in
   test ~/"test/ping.ml" ~requires ~run:false ~with_net:true
+
+let curl =
+  let requires = [affect; affect_unix; curl] in
+  let srcs = [`File ~/"test/affect_curl.ml"; `File ~/"test/affect_curl.mli";] in
+  test ~/"test/test_curl.ml" ~srcs ~requires ~run:false
+
 
 (* Benchmarks *)
 

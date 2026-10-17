@@ -1,4 +1,4 @@
-PKG b0.kit unix tsdl cmdliner
+PKG b0.kit unix tsdl cmdliner curl
 S src/**
 S test/**
 B _b0/b/**
